@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ invitation.eventTitle }} — {{ t('app.name') }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ invitation.eventTitle }}</h1>
+  <p><strong>{{ t('invite.greeting', name=invitation.household.displayName) }}</strong></p>
+  <p class="muted">
+    {{ t('invite.seat_cap', cap=invitation.household.seatCap) }} ·
+    {{ invitation.venue.label }} ·
+    <a href="{{ invitation.venue.mapUrl }}" target="_blank" rel="noopener noreferrer">{{ t('done.map_link') }}</a>
+  </p>
+</div>
+
+{% if error_message %}
+<div class="alert alert--error" role="alert" aria-live="polite" data-error-field="{{ error_field or '' }}">
+  {{ error_message }}
+</div>
+{% endif %}
+
+<form method="post" action="/i/{{ invitation.eventKey }}/{{ token }}">
+  <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
+  <input type="hidden" name="language" value="{{ lang }}">
+
+  {% set replies = form_replies if form_replies is defined and form_replies is not none else invitation.replies %}
+  {% for fn in invitation.functions %}
+    {% include "guest/_function_card.html" %}
+  {% endfor %}
+
+  <div class="card">
+    <button type="submit" class="btn">{{ t('invite.submit') }}</button>
+    <p class="muted" style="margin-top:0.5rem;">{{ t('invite.change_hint') }}</p>
+  </div>
+</form>
+{% endblock %}
+

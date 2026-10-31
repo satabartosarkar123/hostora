@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}My Events · {{ t('app.name') }}{% endblock %}
+
+{% block nav %}
+<a class="btn btn--secondary" href="/app">Events</a>
+<a class="btn btn--secondary" href="/app/events/new">New Event</a>
+<a class="btn btn--secondary" href="/app/settings">Settings</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 style="margin:0;">Your Events</h1>
+    <p class="muted" style="margin:0.25rem 0 0 0;">Signed in as {{ host.name or host.uid }}</p>
+  </div>
+  <a class="btn" href="/app/events/new">+ Create Event</a>
+</div>
+
+{% if events %}
+  {% for ev in events %}
+  <article class="card">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:0.75rem;">
+      <div>
+        <h2 style="margin:0 0 0.35rem 0;">
+          <a href="/app/e/{{ ev.eventKey }}">{{ ev.title }}</a>
+        </h2>
+        <p class="muted" style="margin:0;">
+          Code: <strong>{{ ev.eventKey }}</strong> · {{ ev.venueLabel }} · Budget: ₹{{ "{:,}".format(ev.budgetInr) }}
+        </p>
+      </div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <a class="btn btn--secondary" href="/app/e/{{ ev.eventKey }}">Dashboard</a>
+        <a class="btn btn--secondary" href="/app/e/{{ ev.eventKey }}/guests">Guests</a>
+        <a class="btn btn--secondary" href="/app/e/{{ ev.eventKey }}/invite">Invites</a>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+{% else %}
+  <section class="card">
+    <h2>No events yet</h2>
+    <p class="muted">Create your first event to invite households, predict turnout, and plan food quantities.</p>
+    <a class="btn" href="/app/events/new">Create your first event</a>
+  </section>
+{% endif %}
+{% endblock %}
+

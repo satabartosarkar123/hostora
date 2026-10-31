@@ -1,0 +1,39 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: hostora
+          POSTGRES_PASSWORD: hostora
+          POSTGRES_DB: hostora_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U hostora"
+          --health-interval 2s --health-timeout 5s --health-retries 20
+    env:
+      ENV: test
+      DATABASE_URL: postgresql://hostora:hostora@localhost:5432/hostora
+      TEST_DATABASE_URL: postgresql://hostora:hostora@localhost:5432/hostora_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --all-groups --frozen
+      - run: uv run ruff check . && uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run hostora data-check
+      - run: DATABASE_URL=$TEST_DATABASE_URL uv run alembic upgrade head && DATABASE_URL=$TEST_DATABASE_URL uv run alembic check
+      - run: uv run pytest -m "not e2e and not llm_live" --cov --cov-report=xml --cov-report=term
+      - run: uv run coverage report --fail-under=85
+      - run: uv run coverage report --include='src/hostora/engine/*' --fail-under=95

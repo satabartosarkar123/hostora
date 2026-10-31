@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title or t('error.not_found.title') }} — {{ t('app.name') }}{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>{{ title or t('error.not_found.title') }}</h1>
+  <p>{{ detail or t('error.not_found.detail') }}</p>
+  <p><a class="btn btn--secondary" href="/r">{{ t('code.title') }}</a></p>
+</section>
+{% endblock %}
+

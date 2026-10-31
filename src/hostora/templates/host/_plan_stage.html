@@ -1,0 +1,166 @@
+{% if stage %}
+<div class="alert alert--warn" id="planner-stage-banner" aria-live="polite">
+  <strong>Stage ({{ stage.stage }}):</strong> {{ stage.message or stage.stage }}
+</div>
+{% endif %}
+
+{% if done_plan %}
+<section class="card" id="plan-done-summary">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+    <div>
+      <h2 style="margin:0;">Plan Complete</h2>
+      <p class="muted" style="margin:0.2rem 0 0 0;">
+        Sized for <strong>{{ done_plan.headcount.adults }} adults</strong> and <strong>{{ done_plan.headcount.children }} children</strong>
+        (Veg: {{ done_plan.headcount.veg_seats }}, Jain: {{ done_plan.headcount.jain_seats }}, Non-veg: {{ done_plan.headcount.non_veg_seats }})
+        · Route: <code>{{ done_plan.route }}</code>
+      </p>
+    </div>
+    <div>
+      <span class="badge {% if done_plan.budget.fits %}badge--success{% else %}badge--warn{% endif %}">
+        Estimated Total: ₹{{ "{:,}".format(done_plan.budget.total_inr) }} / Limit: ₹{{ "{:,}".format(done_plan.budget.limit_inr) }}
+      </span>
+    </div>
+  </div>
+
+  {% if done_plan.budget.changes %}
+  <div style="margin-top:0.75rem;">
+    <strong>Budget adjustments:</strong>
+    <ul>
+      {% for chg in done_plan.budget.changes %}
+      <li>{{ chg }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <!-- 3 PANELS: Plan, Check these, Removed -->
+  <div style="display:grid; grid-template-columns: 1fr; gap:1.5rem; margin-top:1.5rem;">
+
+    <!-- Panel 1: Plan (Allowed items) -->
+    <div class="card" id="panel-plan">
+      <h3 style="margin-top:0; color:var(--primary);">Plan (Approved Items)</h3>
+      {% if done_plan.items %}
+      <div style="display:grid; gap:1rem;">
+        {% for it in done_plan.items %}
+        <div class="card" id="item-{{ it.item_id }}" style="border-left: 4px solid #16a34a; padding:0.75rem;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+              <h4 style="margin:0;">{{ it.name }} <span class="badge badge--success">Allowed</span></h4>
+              <p class="muted" style="margin:0.2rem 0;"><em>{{ it.why }}</em> · Course: <strong>{{ it.course }}</strong></p>
+              <p style="margin:0.2rem 0; font-size:0.9rem;">
+                <strong>Quantity:</strong> {{ it.needed }} {{ it.unit }} ({{ it.per_head_basis }})
+              </p>
+              <p style="margin:0.2rem 0; font-size:0.85rem;" class="muted">
+                Price: ₹{{ "{:,.2f}".format(it.price.mid) }}/{{ it.unit }} (Source: {{ it.price.source }}, {{ it.price.observed_on }}) · Est. Total: ₹{{ "{:,}".format(it.est_cost_inr) }}
+              </p>
+            </div>
+            <div style="text-align:right;">
+              <span class="badge">{{ it.serving_kind }}</span>
+            </div>
+          </div>
+          {% if it.options %}
+          <div style="margin-top:0.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+            {% for opt in it.options %}
+            <a class="btn btn--secondary btn--sm" href="{{ opt.url }}" target="_blank" rel="noopener">
+              Buy on {{ opt.label }} {% if opt.inr_per_unit %}· ₹{{ opt.inr_per_unit }}/unit{% endif %}
+            </a>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">No allowed items currently in the plan.</p>
+      {% endif %}
+    </div>
+
+    <!-- Panel 2: Check these (Needs Confirmation) -->
+    <div class="card" id="panel-check-these" style="background:var(--surface-alt);">
+      <h3 style="margin-top:0; color:#d97706;">Check These (Needs Confirmation)</h3>
+      {% if done_plan.needs_confirmation %}
+      <div style="display:grid; gap:1rem;">
+        {% for it in done_plan.needs_confirmation %}
+        <div class="card check-item" id="check-item-{{ it.item_id }}" style="border-left: 4px solid #d97706; padding:0.75rem;">
+          <h4 style="margin:0;">{{ it.name }}</h4>
+          <p class="muted" style="margin:0.2rem 0;">{{ it.why }}</p>
+          {% if it.grounding.reasons %}
+          <div style="margin:0.4rem 0;">
+            <strong style="color:#d97706;">Reasons:</strong>
+            <ul style="margin:0.2rem 0; padding-left:1.25rem;">
+              {% for r in it.grounding.reasons %}
+              <li>{{ r }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+          {% if it.grounding.citations %}
+          <div style="margin:0.4rem 0; font-size:0.85rem;">
+            <strong>Checked by sources:</strong>
+            {% for cite in it.grounding.citations %}
+            <a href="{{ cite }}" target="_blank" rel="noopener" style="margin-left:0.25rem;">[source]</a>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div style="margin-top:0.75rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <button
+              class="btn btn--sm"
+              hx-post="/v1/plans/{{ done_plan.plan_id }}/items/{{ it.item_id }}:confirm"
+              hx-target="#planner-results-container"
+              hx-swap="innerHTML"
+            >
+              Confirm
+            </button>
+            <button
+              class="btn btn--secondary btn--sm"
+              hx-post="/v1/plans/{{ done_plan.plan_id }}/items/{{ it.item_id }}:replace"
+              hx-target="#planner-results-container"
+              hx-swap="innerHTML"
+            >
+              Replace
+            </button>
+            <button
+              class="btn btn--danger btn--sm"
+              hx-post="/v1/plans/{{ done_plan.plan_id }}/items/{{ it.item_id }}:remove"
+              hx-target="#planner-results-container"
+              hx-swap="innerHTML"
+            >
+              Remove
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">All proposed items have met the quorum and safety criteria.</p>
+      {% endif %}
+    </div>
+
+    <!-- Panel 3: Removed Items -->
+    <div class="card" id="panel-removed" style="background:var(--surface-alt);">
+      <h3 style="margin-top:0; color:#dc2626;">Removed Items</h3>
+      {% if done_plan.removed %}
+      <ul style="margin:0; padding-left:1.25rem;">
+        {% for rem in done_plan.removed %}
+        <li class="removed-item" data-item-id="{{ rem.item_id }}" style="margin-bottom:0.5rem;">
+          <strong>{{ rem.name }}</strong> — <code style="color:#dc2626;">{{ rem.reason }}</code>
+          {% if rem.citations %}
+          {% for cite in rem.citations %}
+          <a href="{{ cite }}" target="_blank" rel="noopener" style="font-size:0.85rem; margin-left:0.25rem;">[citation]</a>
+          {% endfor %}
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">No items were removed under active rules.</p>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <footer style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--border); font-size:0.8rem; color:var(--text-muted);">
+    Product and ingredient data from <strong>Open Food Facts</strong> (ODbL) and <strong>Wikidata</strong> (CC0).
+  </footer>
+</section>
+{% endif %}

@@ -1,0 +1,32 @@
+{% macro stepper(input_id, name, label, value, min_val=0, max_val=20) %}
+<div class="form-group">
+  <label class="form-label" for="{{ input_id }}">{{ label }}</label>
+  <div style="display:flex;align-items:center;gap:0.4rem;">
+    <button
+      type="button"
+      class="btn btn--secondary"
+      data-step-target="{{ input_id }}"
+      data-step-delta="-1"
+      aria-label="Decrease {{ label }}"
+    >−</button>
+    <input
+      id="{{ input_id }}"
+      name="{{ name }}"
+      type="number"
+      class="form-control"
+      value="{{ value }}"
+      min="{{ min_val }}"
+      max="{{ max_val }}"
+      style="text-align:center;max-width:90px;"
+    >
+    <button
+      type="button"
+      class="btn btn--secondary"
+      data-step-target="{{ input_id }}"
+      data-step-delta="1"
+      aria-label="Increase {{ label }}"
+    >+</button>
+  </div>
+</div>
+{% endmacro %}
+

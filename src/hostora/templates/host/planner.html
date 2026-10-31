@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Planner · {{ function.name }} · {{ event.title }}{% endblock %}
+
+{% block container_class %}container--wide{% endblock %}
+
+{% block nav %}
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}">Dashboard</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/budget">Budget</a>
+<a class="btn btn--secondary" href="/app">Events</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 style="margin:0;">Food &amp; Supplies Planner · {{ function.name }}</h1>
+    <p class="muted" style="margin:0.25rem 0 0 0;">
+      {{ event.title }} · Meal: <strong>{{ function.meal }}</strong> ·
+      Active rules: <strong>{{ function.rules | join(', ') if function.rules else 'None' }}</strong>
+    </p>
+  </div>
+  <a class="btn btn--secondary" href="/app/e/{{ event_key }}">Back to Dashboard</a>
+</div>
+
+<section class="card">
+  <form
+    method="post"
+    action="/app/e/{{ event_key }}/plan/{{ function_id }}"
+    hx-post="/app/e/{{ event_key }}/plan/{{ function_id }}"
+    hx-target="#planner-results-container"
+    hx-swap="innerHTML"
+    id="planner-form"
+  >
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label" for="plan-brief">Brief or Preferences (optional)</label>
+        <textarea
+          id="plan-brief"
+          name="brief"
+          rows="3"
+          class="form-control"
+          maxlength="1000"
+          placeholder="e.g. North Indian reception dinner, rich starters, light desserts"
+        ></textarea>
+        <p class="muted" style="margin:0.25rem 0 0 0;">Names and phone numbers are removed before the AI sees this.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="plan-days-left">Days Left Override (changes shopping channels)</label>
+        <input
+          id="plan-days-left"
+          name="days_left"
+          type="number"
+          min="0"
+          max="365"
+          class="form-control"
+          placeholder="Leave blank to calculate from function date"
+        >
+        <p class="muted" style="margin:0.25rem 0 0 0;">
+          0 days → 10-minute quick commerce (Blinkit/Zepto/Instamart); &gt;7 days → Amazon/Flipkart.
+        </p>
+      </div>
+    </div>
+    <button type="submit" class="btn" id="generate-plan-btn">Generate Plan</button>
+  </form>
+</section>
+
+<div id="planner-results-container">
+  {% if stream_plan_id %}
+  <div
+    id="plan-stream-root"
+    hx-ext="sse"
+    sse-connect="/v1/plans/{{ stream_plan_id }}/stream"
+    sse-swap="stage,category,done,error"
+  >
+    <div data-sse-target="stage"><div class="card">Starting planner...</div></div>
+    <div data-sse-target="category" id="streamed-categories"></div>
+    <div data-sse-target="done" id="streamed-done"></div>
+    <div data-sse-target="error"></div>
+  </div>
+  {% elif latest_plan %}
+    {% set done_plan = latest_plan %}
+    {% set stage = None %}
+    {% include "host/_plan_stage.html" %}
+    {% for course, items in latest_plan.items | groupby('course') %}
+      {% set plan_id = latest_plan.plan_id %}
+      {% include "host/_plan_category.html" %}
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}
+

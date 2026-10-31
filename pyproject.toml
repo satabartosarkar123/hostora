@@ -89,11 +89,13 @@ markers = [
     "db: needs TEST_DATABASE_URL (Postgres)",
     "e2e: browser tests against a live server",
     "llm_live: calls a real LLM API (skipped unless keys are set)",
+    "knowledge_live: calls real knowledge APIs (OFF, Wikidata, Web)",
 ]
 
 [tool.coverage.run]
 source = ["hostora"]
 branch = true
+concurrency = ["greenlet", "thread"]
 
 [tool.coverage.report]
 show_missing = true

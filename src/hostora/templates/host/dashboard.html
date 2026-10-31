@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}{{ event.title }} · Dashboard{% endblock %}
+
+{% block container_class %}container--wide{% endblock %}
+
+{% block nav %}
+<a class="btn btn--secondary" href="/app">Events</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/guests">Guests</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/invite">Send Invites</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/budget">Budget</a>
+<a class="btn btn--secondary" href="/app/settings">Settings</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 style="margin:0;">{{ event.title }}</h1>
+    <p class="muted" style="margin:0.25rem 0 0 0;">
+      Event code: <strong>{{ event_key }}</strong> · {{ event.venue.label }} · Budget: ₹{{ "{:,}".format(event.budgetInr) }}
+    </p>
+  </div>
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+    <a class="btn btn--secondary" href="/app/e/{{ event_key }}/guests">Manage Guests</a>
+    <a class="btn" href="/app/e/{{ event_key }}/invite">Send Invites</a>
+  </div>
+</div>
+
+{% if demo_qr_svg %}
+<section class="card" style="display:flex; align-items:center; gap:1.25rem; flex-wrap:wrap;">
+  <div>{{ demo_qr_svg | safe }}</div>
+  <div>
+    <h2 style="margin:0 0 0.35rem 0;">Scan to RSVP (Live Demo)</h2>
+    <p class="muted" style="margin:0;">
+      Scan this QR or visit <a href="/demo/join">/demo/join</a> on another phone or browser tab to claim a demo household and watch counts update live.
+    </p>
+  </div>
+</section>
+{% endif %}
+
+<div
+  id="live-summary-container"
+  hx-ext="sse"
+  sse-connect="/v1/events/{{ event_key }}/live?format=html"
+  sse-swap="summary"
+  aria-live="polite"
+>
+  {% include "host/_summary.html" %}
+</div>
+{% endblock %}
+

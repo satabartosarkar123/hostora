@@ -231,3 +231,34 @@ def test_passes_sign_verify_and_reject_forgery_and_expiry() -> None:
     assert verify_pass(token, other_public, 1_900_000_000) is None
     assert verify_pass("garbage", public_hex, 0) is None
     assert verify_pass(token[:-4] + "!!!!", public_hex, 1_900_000_000) is None
+
+
+# ---------- simulate ----------
+
+
+def test_simulate_determinism_and_validation() -> None:
+    from hostora.engine.simulate import run_waste_simulation
+
+    s1 = run_waste_simulation(events=250, seed=7)
+    s2 = run_waste_simulation(events=250, seed=7)
+    assert s1 == s2
+    assert s1.markdown_table == s2.markdown_table
+    assert "synthetic" in s1.markdown_table.lower()
+    assert s1.strategies[2].mean_over_ordered_pct < s1.strategies[0].mean_over_ordered_pct
+    assert s1.strategies[2].plates_saved_per_100_invited > 20.0
+    with pytest.raises(ValueError, match="events must be >= 1"):
+        run_waste_simulation(events=0, seed=7)
+
+
+def test_predict_arrivals_calibrated_orders_bounds() -> None:
+    from hostora.engine.prediction import Rates, predict_arrivals_calibrated
+
+    p = predict_arrivals_calibrated(
+        ReplySeats(yes=200, maybe=40, no_reply=30),
+        low_rates=Rates(0.91, 0.55, 0.18),
+        likely_rates=Rates(0.95, 0.68, 0.28),
+        high_rates=Rates(0.99, 0.82, 0.42),
+    )
+    assert 0 <= p.low <= p.likely <= p.p80 <= p.high
+    with pytest.raises(ValueError, match="non-negative"):
+        predict_arrivals_calibrated(ReplySeats(yes=-1, maybe=0, no_reply=0))

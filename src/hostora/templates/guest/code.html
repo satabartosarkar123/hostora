@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ t('code.title') }} — {{ t('app.name') }}{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>{{ t('code.title') }}</h1>
+  <p class="muted">{{ t('code.help') }}</p>
+
+  {% if error_message %}
+  <div class="alert alert--error" role="alert" aria-live="polite">
+    {{ error_message }}
+  </div>
+  {% endif %}
+
+  <form method="post" action="/r">
+    <div class="form-group">
+      <label class="form-label" for="resolve-code-input">{{ t('landing.code_label') }}</label>
+      <input
+        id="resolve-code-input"
+        name="code"
+        type="text"
+        class="form-control"
+        value="{{ code_value or '' }}"
+        placeholder="{{ t('landing.code_placeholder') }}"
+        required
+        maxlength="14"
+        autocomplete="off"
+      >
+    </div>
+    <button type="submit" class="btn">{{ t('landing.code_submit') }}</button>
+  </form>
+</section>
+{% endblock %}
+

@@ -1,0 +1,43 @@
+{
+  "version": "m9-v1",
+  "backend": "quantile-coordinate-descent",
+  "train_events": 1600,
+  "holdout_events": 400,
+  "low_rates": {
+    "yes": 0.915,
+    "maybe": 0.605,
+    "no_reply": 0.19
+  },
+  "likely_rates": {
+    "yes": 0.945,
+    "maybe": 0.705,
+    "no_reply": 0.275
+  },
+  "high_rates": {
+    "yes": 0.97,
+    "maybe": 0.76,
+    "no_reply": 0.375
+  },
+  "phase1_holdout_mae": 11.48,
+  "calibrated_holdout_mae": 10.97,
+  "hgbr_holdout_mae": null,
+  "phase1_pinball_p50": 5.74,
+  "calibrated_pinball_p50": 5.49,
+  "phase1_reference": {
+    "low": {
+      "yes": 0.93,
+      "maybe": 0.5,
+      "no_reply": 0.15
+    },
+    "likely": {
+      "yes": 0.96,
+      "maybe": 0.7,
+      "no_reply": 0.3
+    },
+    "high": {
+      "yes": 0.99,
+      "maybe": 0.85,
+      "no_reply": 0.45
+    }
+  }
+}

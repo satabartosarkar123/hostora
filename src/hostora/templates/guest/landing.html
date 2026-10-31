@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ t('app.name') }} — {{ t('app.tagline') }}{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>{{ t('app.name') }}</h1>
+  <p>{{ t('app.tagline') }}</p>
+  <p class="muted">{{ t('landing.headline') }}</p>
+</section>
+
+<section class="card" aria-labelledby="have-code-heading">
+  <h2 id="have-code-heading">{{ t('landing.have_code') }}</h2>
+  <form method="post" action="/r">
+    <div class="form-group">
+      <label class="form-label" for="landing-code-input">{{ t('landing.code_label') }}</label>
+      <input
+        id="landing-code-input"
+        name="code"
+        type="text"
+        class="form-control"
+        placeholder="{{ t('landing.code_placeholder') }}"
+        required
+        maxlength="14"
+        autocomplete="off"
+      >
+    </div>
+    <button type="submit" class="btn">{{ t('landing.code_submit') }}</button>
+  </form>
+</section>
+
+<p><a href="/app/login">{{ t('landing.host_cta') }}</a></p>
+{% endblock %}
+

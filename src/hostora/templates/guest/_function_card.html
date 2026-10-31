@@ -1,0 +1,111 @@
+{% from "_macros.html" import stepper %}
+{% set fid = fn.id %}
+{% set rep = replies.get(fid, {}) %}
+{% set cur_att = rep.get('attending', 'yes') %}
+{% set cur_adults = rep.get('adults', 1 if cur_att != 'no' else 0) %}
+{% set cur_children = rep.get('children', 0) %}
+{% set cur_meals = rep.get('meals', {'veg': cur_adults + cur_children, 'jain': 0, 'nonVeg': 0}) %}
+{% set cur_rules = rep.get('dietaryRules', []) %}
+{% set cur_allergies = rep.get('allergies', []) | join(', ') %}
+{% set cur_arrival = rep.get('arrivalWindow', 'on_time') %}
+
+<section class="card function-card" data-function-id="{{ fid }}" aria-labelledby="fn-title-{{ fid }}">
+  <h2 id="fn-title-{{ fid }}">{{ fn.name }}</h2>
+  <p class="muted">
+    <span>{{ fn.startsAt }}</span> · <span>{{ fn.meal | capitalize }}</span> ·
+    <span>{{ fn.venueLabel }}</span>
+  </p>
+
+  <input type="hidden" name="function_ids" value="{{ fid }}">
+
+  <fieldset class="form-group" style="border:0;padding:0;margin:0 0 1rem 0;">
+    <legend class="form-label">{{ t('rsvp.attending.label') }}</legend>
+    <div class="chip-group">
+      <label class="chip-label" for="att-{{ fid }}-yes">
+        <input
+          id="att-{{ fid }}-yes"
+          type="radio"
+          name="attending_{{ fid }}"
+          value="yes"
+          {% if cur_att == 'yes' %}checked{% endif %}
+        >
+        <span>{{ t('rsvp.attending.yes') }}</span>
+      </label>
+      <label class="chip-label" for="att-{{ fid }}-maybe">
+        <input
+          id="att-{{ fid }}-maybe"
+          type="radio"
+          name="attending_{{ fid }}"
+          value="maybe"
+          {% if cur_att == 'maybe' %}checked{% endif %}
+        >
+        <span>{{ t('rsvp.attending.maybe') }}</span>
+      </label>
+      <label class="chip-label" for="att-{{ fid }}-no">
+        <input
+          id="att-{{ fid }}-no"
+          type="radio"
+          name="attending_{{ fid }}"
+          value="no"
+          {% if cur_att == 'no' %}checked{% endif %}
+        >
+        <span>{{ t('rsvp.attending.no') }}</span>
+      </label>
+    </div>
+  </fieldset>
+
+  <div class="grid-2">
+    {{ stepper('adults_' ~ fid, 'adults_' ~ fid, t('rsvp.adults') ~ ' (' ~ fn.name ~ ')', cur_adults, 0, invitation.household.seatCap) }}
+    {{ stepper('children_' ~ fid, 'children_' ~ fid, t('rsvp.children') ~ ' (' ~ fn.name ~ ')', cur_children, 0, invitation.household.seatCap) }}
+  </div>
+
+  <p class="form-label">{{ t('rsvp.meals.title') }}</p>
+  <div class="grid-3">
+    {{ stepper('veg_' ~ fid, 'veg_' ~ fid, t('rsvp.meals.veg') ~ ' (' ~ fn.name ~ ')', cur_meals.get('veg', 0), 0, invitation.household.seatCap) }}
+    {{ stepper('jain_' ~ fid, 'jain_' ~ fid, t('rsvp.meals.jain') ~ ' (' ~ fn.name ~ ')', cur_meals.get('jain', 0), 0, invitation.household.seatCap) }}
+    {{ stepper('non_veg_' ~ fid, 'non_veg_' ~ fid, t('rsvp.meals.non_veg') ~ ' (' ~ fn.name ~ ')', cur_meals.get('nonVeg', 0), 0, invitation.household.seatCap) }}
+  </div>
+
+  <fieldset class="form-group" style="border:0;padding:0;margin:0 0 1rem 0;">
+    <legend class="form-label">{{ t('rsvp.dietary_rules') }}</legend>
+    <div class="chip-group">
+      {% for rule_id, rule_obj in all_rules.items() %}
+      <label class="chip-label" for="rule-{{ fid }}-{{ rule_id }}">
+        <input
+          id="rule-{{ fid }}-{{ rule_id }}"
+          type="checkbox"
+          name="rules_{{ fid }}"
+          value="{{ rule_id }}"
+          {% if rule_id in cur_rules %}checked{% endif %}
+        >
+        <span>{{ rule_obj.label }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+
+  <div class="grid-2">
+    <div class="form-group">
+      <label class="form-label" for="allergies_{{ fid }}">{{ t('rsvp.allergies') }}</label>
+      <input
+        id="allergies_{{ fid }}"
+        name="allergies_{{ fid }}"
+        type="text"
+        class="form-control"
+        value="{{ cur_allergies }}"
+        placeholder="peanuts, shellfish"
+        maxlength="120"
+      >
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="arrival_{{ fid }}">{{ t('rsvp.arrival_window') }}</label>
+      <select id="arrival_{{ fid }}" name="arrival_{{ fid }}" class="form-control">
+        <option value="on_time" {% if cur_arrival == 'on_time' %}selected{% endif %}>{{ t('rsvp.arrival.on_time') }}</option>
+        <option value="plus_1h" {% if cur_arrival == 'plus_1h' %}selected{% endif %}>{{ t('rsvp.arrival.plus_1h') }}</option>
+        <option value="late" {% if cur_arrival == 'late' %}selected{% endif %}>{{ t('rsvp.arrival.late') }}</option>
+      </select>
+    </div>
+  </div>
+</section>
+

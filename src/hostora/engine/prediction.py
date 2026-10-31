@@ -51,3 +51,21 @@ def predict_arrivals(seats: ReplySeats) -> Prediction:
     high = math.ceil(_apply(seats, HIGH))
     p80 = round(likely + 0.6 * (high - likely))
     return Prediction(low=low, likely=likely, high=high, p80=p80)
+
+
+def predict_arrivals_calibrated(
+    seats: ReplySeats,
+    *,
+    low_rates: Rates = LOW,
+    likely_rates: Rates = LIKELY,
+    high_rates: Rates = HIGH,
+) -> Prediction:
+    """Predict turnout using quantile-calibrated rates (`low <= likely <= p80 <= high`)."""
+    for v in (seats.yes, seats.maybe, seats.no_reply):
+        if v < 0:
+            raise ValueError("seat counts must be non-negative")
+    raw_low = max(0, math.floor(_apply(seats, low_rates)))
+    raw_likely = max(raw_low, round(_apply(seats, likely_rates)))
+    raw_high = max(raw_likely, math.ceil(_apply(seats, high_rates)))
+    p80 = round(raw_likely + 0.6 * (raw_high - raw_likely))
+    return Prediction(low=raw_low, likely=raw_likely, high=raw_high, p80=p80)

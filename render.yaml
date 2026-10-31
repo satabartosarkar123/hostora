@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: hostora
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    envVars:
+      - key: ENV
+        value: prod
+      - key: DEMO_MODE
+        value: "true"
+      - key: GEMINI_ALLOWED
+        value: "false"
+      - key: PUBLIC_ORIGIN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: TOKEN_HMAC_SECRET
+        sync: false
+      - key: PHONE_ENC_KEY
+        sync: false
+      - key: PASS_SIGNING_KEY
+        sync: false
+      - key: PASS_PUBLIC_KEY
+        sync: false
+      - key: CRON_SECRET
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_API_KEY
+        sync: false
+      - key: FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: FIREBASE_APP_ID
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+

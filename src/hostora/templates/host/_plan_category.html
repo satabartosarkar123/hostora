@@ -1,0 +1,67 @@
+<section class="card plan-category-card" data-course="{{ course }}">
+  <h3 style="margin-top:0; text-transform:capitalize;">{{ course }}</h3>
+  <div class="grid-2">
+    {% for item in items %}
+    {% set p = purchases.get(item.item_id) if purchases else None %}
+    <article class="card plan-item-card" data-item-id="{{ item.item_id }}" style="margin-bottom:0;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.5rem;">
+        <div>
+          <h4 style="margin:0;">{{ item.name }}</h4>
+          <p class="muted" style="margin:0.2rem 0;">
+            Need: {{ item.needed }} {{ item.unit }} → Buy: <strong>{{ item.buy_total }} {{ item.unit }}</strong>
+            ({% for pk in item.packs %}{{ pk.count }}×{{ pk.size }}{{ item.unit }}{% if not loop.last %}, {% endif %}{% endfor %})
+          </p>
+          <p class="muted" style="margin:0;">{{ item.per_head_basis }}</p>
+        </div>
+        <div style="text-align:right;">
+          <strong>₹{{ "{:,}".format(item.est_cost_inr) }}</strong>
+        </div>
+      </div>
+
+      {% if item.allergen_warnings %}
+      <p class="badge badge--warn" style="margin-top:0.5rem;">
+        Allergen warning: {{ item.allergen_warnings | join(', ') }}
+      </p>
+      {% endif %}
+
+      <div style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.75rem;">
+        {% for offer in item.offers %}
+        <a
+          href="{{ offer.url }}"
+          class="btn btn--secondary offer-link"
+          target="_blank"
+          rel="noopener noreferrer"
+          style="padding:0.35rem 0.7rem; font-size:0.88rem; min-height:38px;"
+        >
+          Buy on {{ offer.label }}
+        </a>
+        {% endfor %}
+      </div>
+
+      {% if plan_id and event_key %}
+      <div style="margin-top:0.75rem; display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+        <form
+          method="post"
+          action="/app/e/{{ event_key }}/plan/{{ plan_id }}/items/{{ item.item_id }}/toggle"
+          hx-post="/app/e/{{ event_key }}/plan/{{ plan_id }}/items/{{ item.item_id }}/toggle"
+          hx-target="#purchase-status-{{ item.item_id }}"
+          hx-swap="innerHTML"
+          style="display:inline;"
+        >
+          <input type="hidden" name="bought" value="true">
+          <button type="submit" class="btn btn--secondary" style="padding:0.3rem 0.65rem; font-size:0.85rem; min-height:38px;">
+            Mark bought
+          </button>
+        </form>
+        <span id="purchase-status-{{ item.item_id }}">
+          {% if p and p.bought %}
+          <span class="badge badge--success">Bought ✓</span>
+          {% endif %}
+        </span>
+      </div>
+      {% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+

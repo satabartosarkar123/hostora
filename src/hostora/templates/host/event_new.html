@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}New Event · {{ t('app.name') }}{% endblock %}
+
+{% block nav %}
+<a class="btn btn--secondary" href="/app">Events</a>
+<a class="btn btn--secondary" href="/app/settings">Settings</a>
+{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Create a New Event</h1>
+  {% if error_message %}
+  <div class="alert alert--error" role="alert" aria-live="polite">{{ error_message }}</div>
+  {% endif %}
+
+  <form method="post" action="/app/events/new" id="new-event-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <div class="form-group">
+      <label class="form-label" for="event-title">Event Title</label>
+      <input
+        id="event-title"
+        name="title"
+        type="text"
+        class="form-control"
+        placeholder="e.g. Arjun & Sara Wedding"
+        required
+      >
+    </div>
+
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label" for="event-type">Event Type</label>
+        <select id="event-type" name="type" class="form-control">
+          <option value="wedding">Wedding</option>
+          <option value="reception">Reception</option>
+          <option value="birthday">Birthday Party</option>
+          <option value="housewarming">Housewarming</option>
+          <option value="festival">Festival</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="event-tradition">Tradition Template (names functions only)</label>
+        <select id="event-tradition" name="tradition" class="form-control">
+          {% for tid, tinfo in traditions.items() %}
+          <option value="{{ tid }}">{{ tinfo.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <h2>Functions</h2>
+    <p class="muted">You can rename, add, or leave blank any unused function slot. Diet and faith rules are chosen per function.</p>
+
+    {% for idx in range(3) %}
+    <fieldset class="card" style="margin-bottom:1rem;">
+      <legend style="font-weight:700; padding:0 0.4rem;">Function {{ idx + 1 }}{% if idx > 0 %} (Optional){% endif %}</legend>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="fn-name-{{ idx }}">Function Name</label>
+          <input
+            id="fn-name-{{ idx }}"
+            name="fn_name"
+            type="text"
+            class="form-control"
+            value="{% if idx == 0 %}Main event{% endif %}"
+            placeholder="{% if idx == 0 %}e.g. Lunch{% else %}Leave blank if not needed{% endif %}"
+            {% if idx == 0 %}required{% endif %}
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="fn-starts-{{ idx }}">Date &amp; Time</label>
+          <input
+            id="fn-starts-{{ idx }}"
+            name="fn_starts_at"
+            type="datetime-local"
+            class="form-control"
+            value="{{ default_date }}"
+          >
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="fn-meal-{{ idx }}">Meal</label>
+          <select id="fn-meal-{{ idx }}" name="fn_meal" class="form-control">
+            <option value="lunch" {% if idx == 0 %}selected{% endif %}>Lunch</option>
+            <option value="dinner" {% if idx != 0 %}selected{% endif %}>Dinner</option>
+            <option value="snacks">Snacks</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="fn-gate-{{ idx }}">QR Gate Mode</label>
+          <select id="fn-gate-{{ idx }}" name="fn_gate_mode" class="form-control">
+            <option value="off">Off</option>
+            <option value="soft">Soft (warn on unknown)</option>
+            <option value="strict">Strict (verified passes only)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <span class="form-label">Diet &amp; Faith Rules</span>
+        <div class="chip-group">
+          {% for rule_id, rule_set in all_rules.items() %}
+          <label class="chip-label">
+            <input type="checkbox" name="fn_rules_{{ idx }}" value="{{ rule_id }}">
+            <span>{{ rule_set.label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+    </fieldset>
+    {% endfor %}
+
+    <h2>Venue &amp; Budget</h2>
+    <div class="form-group">
+      <label class="form-label" for="venue-label">Venue Name &amp; Address</label>
+      <input
+        id="venue-label"
+        name="venue_label"
+        type="text"
+        class="form-control"
+        value="Banyan Grove Lawn, Bengaluru"
+        required
+      >
+    </div>
+
+    <div class="grid-3">
+      <div class="form-group">
+        <label class="form-label" for="venue-lat">Latitude</label>
+        <input id="venue-lat" name="venue_lat" type="number" step="any" class="form-control" value="12.9716" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="venue-lng">Longitude</label>
+        <input id="venue-lng" name="venue_lng" type="number" step="any" class="form-control" value="77.5946" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="venue-pincode">Pincode (6 digits)</label>
+        <input id="venue-pincode" name="pincode" type="text" pattern="[0-9]{6}" class="form-control" value="560001">
+      </div>
+    </div>
+
+    <p class="muted">Map attribution: © OpenStreetMap contributors.</p>
+
+    <div class="form-group">
+      <label class="form-label" for="budget-inr">Food &amp; Supplies Budget (INR)</label>
+      <input id="budget-inr" name="budget_inr" type="number" min="0" step="500" class="form-control" value="60000" required>
+    </div>
+
+    <button type="submit" class="btn" id="create-event-submit">Create Event</button>
+  </form>
+</section>
+{% endblock %}
+

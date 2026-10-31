@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Settings · {{ t('app.name') }}{% endblock %}
+
+{% block nav %}
+<a class="btn btn--secondary" href="/app">Events</a>
+<a class="btn btn--secondary" href="/app/settings">Settings</a>
+{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Account Settings</h1>
+  <p class="muted">Signed in as <strong>{{ host.name or host.uid }}</strong> ({{ host.uid }})</p>
+
+  <h2>Language</h2>
+  <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem;">
+    <a class="btn {% if lang == 'en' %}btn{% else %}btn--secondary{% endif %}" href="/app/settings?lang=en">English</a>
+    <a class="btn {% if lang == 'hi' %}btn{% else %}btn--secondary{% endif %}" href="/app/settings?lang=hi">हिन्दी (Hindi)</a>
+  </div>
+
+  <h2>Sign Out</h2>
+  <form method="post" action="/auth/logout" style="margin-bottom:2rem;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="btn btn--secondary">Sign Out</button>
+  </form>
+
+  <h2>Delete Account</h2>
+  <p class="muted">
+    Deleting your account immediately deletes all your events, households, invitations, replies, and gate passes.
+  </p>
+  {% if error_message %}
+  <div class="alert alert--error" role="alert" aria-live="polite">{{ error_message }}</div>
+  {% endif %}
+  <form method="post" action="/app/settings/delete">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="form-group">
+      <label class="form-label" for="delete-confirm">Type <code>DELETE</code> to confirm</label>
+      <input id="delete-confirm" name="confirm" type="text" class="form-control" placeholder="DELETE" required>
+    </div>
+    <button type="submit" class="btn btn--danger">Delete Account Immediately</button>
+  </form>
+</section>
+{% endblock %}
+

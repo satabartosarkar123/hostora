@@ -1,0 +1,22 @@
+{
+  "name": "Hostora",
+  "short_name": "Hostora",
+  "description": "Smart Indian event RSVPs, turnout prediction, diet-safe food planning, and offline venue gate.",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#faf9f6",
+  "theme_color": "#0f52ba",
+  "icons": [
+    {
+      "src": "/static/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+

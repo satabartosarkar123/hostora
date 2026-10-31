@@ -1,0 +1,16 @@
+.venv
+.git
+tests
+.env
+.env.*
+!.env.example
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+coverage.xml
+test-results
+playwright-report
+

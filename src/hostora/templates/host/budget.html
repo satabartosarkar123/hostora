@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Budget · {{ event.title }}{% endblock %}
+
+{% block container_class %}container--wide{% endblock %}
+
+{% block nav %}
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}">Dashboard</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/guests">Guests</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/budget">Budget</a>
+<a class="btn btn--secondary" href="/app">Events</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 style="margin:0;">Budget vs Bought · {{ event.title }}</h1>
+    <p class="muted" style="margin:0.25rem 0 0 0;">
+      Event Budget: <strong>₹{{ "{:,}".format(event.budgetInr) }}</strong> ·
+      Planned: <strong>₹{{ "{:,}".format(total_planned) }}</strong> ·
+      Bought: <strong>₹{{ "{:,}".format(total_bought) }}</strong>
+    </p>
+  </div>
+  <a class="btn btn--secondary" href="/app/e/{{ event_key }}">Back to Dashboard</a>
+</div>
+
+<section class="card">
+  <h2 style="margin-top:0;">By Category</h2>
+  {% if by_category %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Items</th>
+          <th>Planned (INR)</th>
+          <th>Bought (INR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cat, stats in by_category.items() %}
+        <tr>
+          <td style="text-transform:capitalize;"><strong>{{ cat }}</strong></td>
+          <td>{{ stats.count }}</td>
+          <td>₹{{ "{:,}".format(stats.planned_inr) }}</td>
+          <td>₹{{ "{:,}".format(stats.bought_inr) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No plans generated yet. Generate a plan from the dashboard first.</p>
+  {% endif %}
+</section>
+{% endblock %}
+

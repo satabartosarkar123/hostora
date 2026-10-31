@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Guests · {{ event.title }}{% endblock %}
+
+{% block container_class %}container--wide{% endblock %}
+
+{% block nav %}
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}">Dashboard</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/guests">Guests</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/invite">Send Invites</a>
+<a class="btn btn--secondary" href="/app">Events</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 style="margin:0;">Guests · {{ event.title }}</h1>
+    <p class="muted" style="margin:0.25rem 0 0 0;">Total households: <strong>{{ households | length }}</strong></p>
+  </div>
+  <a class="btn" href="/app/e/{{ event_key }}/invite">Prepare &amp; Send Invites</a>
+</div>
+
+{% if error_message %}
+<div class="alert alert--error" role="alert" aria-live="polite">{{ error_message }}</div>
+{% endif %}
+
+<div class="grid-2">
+  <section class="card">
+    <h2 style="margin-top:0;">Add One Household</h2>
+    <form method="post" action="/app/e/{{ event_key }}/guests">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-group">
+        <label class="form-label" for="hh-name">Household Name</label>
+        <input id="hh-name" name="display_name" type="text" class="form-control" placeholder="e.g. Sharma Family" required>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label" for="hh-phone">Phone (optional)</label>
+          <input id="hh-phone" name="phone" type="tel" class="form-control" placeholder="+91 98765 43210">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="hh-seats">Seat Cap (1–20)</label>
+          <input id="hh-seats" name="seat_cap" type="number" min="1" max="20" value="4" class="form-control" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="hh-lang">Language</label>
+        <select id="hh-lang" name="language" class="form-control">
+          <option value="en">English</option>
+          <option value="hi">हिन्दी (Hindi)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <span class="form-label">Invited Functions</span>
+        <div class="chip-group">
+          {% for fn in event.functions %}
+          <label class="chip-label">
+            <input type="checkbox" name="function_ids" value="{{ fn.id }}" checked>
+            <span>{{ fn.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <button type="submit" class="btn">Add Household</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0;">Import Households from CSV</h2>
+    <p class="muted">Columns: <code>name,phone,seats,functions</code> (functions separated by <code>;</code>, e.g. <code>Lunch;Reception</code>)</p>
+    <form method="post" action="/app/e/{{ event_key }}/guests/csv" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-group">
+        <label class="form-label" for="csv-text">Paste CSV</label>
+        <textarea
+          id="csv-text"
+          name="csv_text"
+          rows="6"
+          class="form-control"
+          placeholder="name,phone,seats,functions&#10;Rao Family,+910000012345,4,Lunch;Reception"
+        >{{ csv_raw }}</textarea>
+      </div>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+        <button type="submit" name="action" value="preview" class="btn btn--secondary" id="csv-preview-btn">Preview CSV</button>
+        <button type="submit" name="action" value="save" class="btn" id="csv-save-btn">Import &amp; Save</button>
+      </div>
+    </form>
+
+    {% if csv_preview %}
+    <div style="margin-top:1rem;">
+      <h3>CSV Preview</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Row</th>
+              <th>Name</th>
+              <th>Seats</th>
+              <th>Functions</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in csv_preview %}
+            <tr>
+              <td>{{ r.row }}</td>
+              <td>{{ r.name }}</td>
+              <td>{{ r.seats }}</td>
+              <td>{{ r.functions }}</td>
+              <td>
+                {% if r.error %}
+                <span class="badge badge--error">{{ r.error }}</span>
+                {% else %}
+                <span class="badge badge--success">Valid</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h2 style="margin-top:0;">Household List</h2>
+  {% if households %}
+  <div class="table-wrap">
+    <table id="households-table">
+      <thead>
+        <tr>
+          <th>Household</th>
+          <th>Code</th>
+          <th>Phone</th>
+          <th>Max Seats</th>
+          <th>Reply Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for hh in households %}
+        <tr>
+          <td><strong>{{ hh.displayName }}</strong></td>
+          <td><code>{{ hh.code }}</code></td>
+          <td>{{ hh.phoneMasked or "—" }}</td>
+          <td>{{ hh.seatCap }}</td>
+          <td>
+            {% if hh.replies %}
+              {% for fid, rep in hh.replies.items() %}
+              <span class="badge">{{ rep.status }} ({{ rep.adults + rep.children }})</span>
+              {% endfor %}
+            {% else %}
+              <span class="muted">No reply yet</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No households added yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
+

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ t('done.title') }} — {{ invitation.eventTitle }}{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="alert alert--success" role="status" aria-live="polite">
+    <strong>{{ t('done.title') }}</strong>
+  </div>
+  <h1>{{ invitation.eventTitle }}</h1>
+  <p>{{ t('done.summary', event=invitation.eventTitle) }}</p>
+  <p>
+    <strong>{{ invitation.venue.label }}</strong> ·
+    <a href="{{ invitation.venue.mapUrl }}" target="_blank" rel="noopener noreferrer">{{ t('done.map_link') }}</a>
+  </p>
+
+  <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-top:1rem;">
+    {% for fn in invitation.functions %}
+    <a class="btn btn--secondary" href="/i/{{ invitation.eventKey }}/{{ token }}/calendar.ics?fn={{ fn.id }}">
+      {{ t('done.add_calendar', name=fn.name) }}
+    </a>
+    {% endfor %}
+    <a class="btn" href="/i/{{ invitation.eventKey }}/{{ token }}">{{ t('done.change_reply') }}</a>
+  </div>
+</section>
+
+{% if invitation.passes %}
+<section class="card" aria-labelledby="passes-heading">
+  <h2 id="passes-heading">{{ t('done.pass_heading') }}</h2>
+  <div class="grid-2">
+    {% for p in invitation.passes %}
+    <div class="card" style="text-align:center;">
+      <p><strong>{{ p.passId }}</strong> · {{ t('done.pass_seats', seats=p.seats) }}</p>
+      <img
+        src="/i/{{ invitation.eventKey }}/{{ token }}/pass/{{ p.passId }}.svg"
+        alt="QR pass {{ p.passId }}"
+        width="180"
+        height="180"
+      >
+      <p style="margin-top:0.5rem;">
+        <a class="btn btn--secondary" href="/i/{{ invitation.eventKey }}/{{ token }}/pass/{{ p.passId }}.svg" download="pass-{{ p.passId }}.svg">
+          {{ t('done.save_pass') }}
+        </a>
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+

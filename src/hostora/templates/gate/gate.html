@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Venue Gate · {{ event_key }} · {{ t('app.name') }}{% endblock %}
+
+{% block head %}
+<style>
+  .gate-banner--green {
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: var(--success-text);
+  }
+  .gate-banner--amber {
+    background: var(--warn-bg);
+    color: var(--warn-text);
+    border-color: var(--warn-text);
+  }
+  .gate-banner--red {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-color: var(--danger-text);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div
+  id="gate-app"
+  data-event-key="{{ event_key }}"
+  data-gate-token="{{ gate_token }}"
+  data-function-id="{{ function_id }}"
+>
+  <section class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+      <div>
+        <h1 style="margin:0;">Venue QR Gate · {{ event_key }}</h1>
+        <p class="muted" id="gate-function-name" style="margin:0.2rem 0 0 0;">Loading manifest...</p>
+      </div>
+      <div style="display:flex; gap:1rem;">
+        <div>
+          <span class="muted">Device Arrivals:</span>
+          <strong id="gate-local-arrivals">0</strong>
+        </div>
+        <div>
+          <span class="muted">Pending Sync:</span>
+          <strong id="gate-unsent-count">0</strong>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="gate-result-banner" class="card gate-banner" data-status="idle" role="status" aria-live="polite">
+    <h2 style="margin:0 0 0.25rem 0;">Ready to Scan</h2>
+    <p class="muted" style="margin:0;">Point the rear camera at a guest's QR pass or enter the pass string below.</p>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0;">Scan or Paste Pass Token</h2>
+    <form id="gate-manual-scan-form" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <label class="form-label" for="gate-token-input" style="width:100%; margin-bottom:0.2rem;">Pass Token</label>
+      <input
+        id="gate-token-input"
+        type="text"
+        class="form-control"
+        placeholder="v1.EVENT.PASSID.SEATS.EXP.SIG"
+        style="flex:1;"
+      >
+      <button type="submit" class="btn">Verify Pass</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0;">Manual Household Lookup</h2>
+    <div class="form-group">
+      <label class="form-label" for="gate-lookup-input">Search Household Name or Pass ID</label>
+      <input
+        id="gate-lookup-input"
+        type="search"
+        class="form-control"
+        placeholder="Type a family name..."
+      >
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Household</th>
+            <th>Pass ID</th>
+            <th>Allowed Seats</th>
+          </tr>
+        </thead>
+        <tbody id="gate-lookup-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/vendor/jsQR.js?v={{ asset_v }}" defer></script>
+<script type="module" src="/static/js/gate/app.js?v={{ asset_v }}"></script>
+{% endblock %}
+

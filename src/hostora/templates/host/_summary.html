@@ -1,0 +1,63 @@
+{% for fn in summary.functions %}
+<section class="card function-summary-card" data-function-id="{{ fn.function_id }}" data-function-name="{{ fn.name }}">
+  <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem; margin-bottom:0.75rem;">
+    <div>
+      <h2 style="margin:0;">{{ fn.name }} <span class="muted">({{ fn.meal.value }})</span></h2>
+      <p class="muted" style="margin:0.2rem 0 0 0;">
+        Households replied: <strong class="replied-households">{{ fn.replied_households }}</strong> / <span class="invited-households">{{ fn.invited_households }}</span>
+      </p>
+    </div>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+      <a class="btn btn--secondary" href="/app/e/{{ event_key }}/plan/{{ fn.function_id }}">Plan Food &amp; Supplies</a>
+    </div>
+  </div>
+
+  <div class="grid-3">
+    <div class="card" style="margin:0; background:var(--surface-alt);">
+      <span class="muted">Predicted Turnout</span>
+      <p class="stat-value">likely <span class="pred-likely">{{ fn.prediction.likely }}</span></p>
+      <p class="muted" style="margin:0;">(low {{ fn.prediction.low }} – high {{ fn.prediction.high }})</p>
+    </div>
+
+    <div class="card" style="margin:0; background:var(--surface-alt);">
+      <span class="muted">Caterer Order (P80)</span>
+      <p class="stat-value" style="font-size:1.35rem;">Tell your caterer: <strong class="recommended-plates">{{ fn.recommended_plates }} plates</strong></p>
+      <p class="muted" style="margin:0;">Children: {{ fn.children }}</p>
+    </div>
+
+    <div class="card" style="margin:0; background:var(--surface-alt);">
+      <span class="muted">Seat Replies</span>
+      <p style="margin:0.35rem 0 0 0;">
+        Yes: <strong class="yes-seats">{{ fn.seats.yes }}</strong> ·
+        Maybe: <strong class="maybe-seats">{{ fn.seats.maybe }}</strong> ·
+        Awaiting: <strong class="no-reply-seats">{{ fn.seats.no_reply }}</strong>
+      </p>
+      <p class="muted" style="margin:0.2rem 0 0 0;">Declined households: {{ fn.seats.no_households }}</p>
+    </div>
+  </div>
+
+  <div class="grid-2" style="margin-top:0.85rem;">
+    <div>
+      <strong>Confirmed Meal Split (Totals Only):</strong>
+      <p class="muted" style="margin:0.25rem 0 0 0;">
+        Veg: <strong>{{ fn.meals.veg }}</strong> ·
+        Jain: <strong>{{ fn.meals.jain }}</strong> ·
+        Non-veg: <strong>{{ fn.meals.non_veg }}</strong>
+      </p>
+    </div>
+    <div>
+      <strong>Gate Check-in:</strong>
+      <p class="muted" style="margin:0.25rem 0 0 0;">
+        Arrivals: <strong class="gate-arrivals">{{ fn.arrivals }}</strong>
+        {% if fn.possible_duplicates > 0 %}
+        · <span class="badge badge--warn">Possible duplicates: {{ fn.possible_duplicates }}</span>
+        {% endif %}
+        {% if fn.unknown_passes > 0 %}
+        · <span class="badge badge--warn">Unknown passes: {{ fn.unknown_passes }}</span>
+        {% endif %}
+      </p>
+    </div>
+  </div>
+</section>
+{% endfor %}
+

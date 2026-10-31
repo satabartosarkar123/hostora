@@ -1,0 +1,52 @@
+{"id": "brief_001", "event_type": "wedding", "meal": "dinner", "rules": ["halal", "no_beef"], "budget_inr": 60000, "brief": "Interfaith nikah and reception dinner for 150 guests, traditional biryani and kebabs."}
+{"id": "brief_002", "event_type": "wedding", "meal": "lunch", "rules": ["jain", "pure_veg", "no_alcohol"], "budget_inr": 45000, "brief": "Marwari Jain wedding lunch, strictly no onion or garlic, paneer and pulao preferred."}
+{"id": "brief_003", "event_type": "wedding", "meal": "dinner", "rules": ["pure_veg", "no_alcohol"], "budget_inr": 50000, "brief": "South Indian Muhurtham & reception dinner, pure vegetarian family meal with sweets."}
+{"id": "brief_004", "event_type": "wedding", "meal": "lunch", "rules": ["no_beef", "no_pork"], "budget_inr": 70000, "brief": "Punjabi Anand Karaj lunch with rich north Indian starters, dal makhani, naan and chicken."}
+{"id": "brief_005", "event_type": "wedding", "meal": "dinner", "rules": ["no_beef"], "budget_inr": 80000, "brief": "Bengali Boubhat dinner with fish fry starter, mutton biryani and gulab jamun."}
+{"id": "brief_006", "event_type": "wedding", "meal": "dinner", "rules": [], "budget_inr": 90000, "brief": "Goan Catholic wedding reception dinner with roasts, wine, and cake."}
+{"id": "brief_007", "event_type": "wedding", "meal": "dinner", "rules": ["halal", "no_alcohol"], "budget_inr": 55000, "brief": "Hyderabadi Valima dinner with mutton and chicken biryani, lime soda and gulab jamun."}
+{"id": "brief_008", "event_type": "wedding", "meal": "snacks", "rules": ["pure_veg", "eggless"], "budget_inr": 25000, "brief": "Haldi and Mehendi afternoon snacks, hara bhara kebab, fresh lime soda and eggless cake."}
+{"id": "brief_009", "event_type": "wedding", "meal": "dinner", "rules": ["vegan", "no_alcohol"], "budget_inr": 40000, "brief": "Eco-friendly vegan court marriage reception dinner with jeera rice and lime soda."}
+{"id": "brief_010", "event_type": "wedding", "meal": "lunch", "rules": ["jain"], "budget_inr": 35000, "brief": "Gujarati lagan lunch with Jain veg pulao and Jain paneer sabzi."}
+{"id": "brief_011", "event_type": "birthday", "meal": "snacks", "rules": ["pure_veg", "eggless", "no_alcohol"], "budget_inr": 15000, "brief": "First birthday party at home, eggless cake, hara bhara kebab and soft drinks for kids."}
+{"id": "brief_012", "event_type": "birthday", "meal": "dinner", "rules": ["no_beef", "no_pork"], "budget_inr": 30000, "brief": "50th milestone birthday dinner with chicken tikka, paneer butter masala and naan."}
+{"id": "brief_013", "event_type": "birthday", "meal": "dinner", "rules": ["halal"], "budget_inr": 28000, "brief": "Teenager birthday dinner at terrace, chicken biryani, kebabs and soft drinks."}
+{"id": "brief_014", "event_type": "birthday", "meal": "snacks", "rules": ["jain", "eggless"], "budget_inr": 18000, "brief": "Grandmother 75th birthday satsang and high tea, strictly Jain snacks."}
+{"id": "brief_015", "event_type": "birthday", "meal": "dinner", "rules": [], "budget_inr": 45000, "brief": "30th birthday cocktail dinner party with starters, wine and biryani."}
+{"id": "brief_016", "event_type": "housewarming", "meal": "lunch", "rules": ["pure_veg", "no_alcohol"], "budget_inr": 22000, "brief": "Griha Pravesh pooja and lunch for 60 relatives, pure vegetarian north Indian menu."}
+{"id": "brief_017", "event_type": "housewarming", "meal": "dinner", "rules": ["no_beef", "no_pork", "no_alcohol"], "budget_inr": 32000, "brief": "New flat housewarming dinner for friends and neighbours, mixed veg and chicken."}
+{"id": "brief_018", "event_type": "housewarming", "meal": "lunch", "rules": ["jain", "pure_veg"], "budget_inr": 26000, "brief": "Vastu shanti lunch, strictly Jain food without root vegetables."}
+{"id": "brief_019", "event_type": "housewarming", "meal": "snacks", "rules": ["eggless", "pure_veg"], "budget_inr": 12000, "brief": "Evening Griha Pravesh tea and snacks with kebabs, sweets and cold drinks."}
+{"id": "brief_020", "event_type": "housewarming", "meal": "dinner", "rules": ["halal", "no_alcohol"], "budget_inr": 35000, "brief": "Barkat dua and family dinner at new home with chicken biryani and sheer/sweets."}
+{"id": "brief_021", "event_type": "festival", "meal": "dinner", "rules": ["pure_veg", "no_alcohol"], "budget_inr": 28000, "brief": "Diwali card party and family dinner, pure veg starters, paneer, dal makhani and Mithai."}
+{"id": "brief_022", "event_type": "festival", "meal": "lunch", "rules": ["halal", "no_alcohol"], "budget_inr": 40000, "brief": "Eid-ul-Fitr open house lunch with mutton biryani, chicken tikka and gulab jamun."}
+{"id": "brief_023", "event_type": "festival", "meal": "dinner", "rules": [], "budget_inr": 38000, "brief": "Christmas family feast with roast, wine, cake and fairy lights."}
+{"id": "brief_024", "event_type": "festival", "meal": "lunch", "rules": ["no_beef"], "budget_inr": 34000, "brief": "Durga Puja Nabami para lunch with fish fry, mutton biryani and sweets."}
+{"id": "brief_025", "event_type": "festival", "meal": "lunch", "rules": ["pure_veg", "no_alcohol"], "budget_inr": 20000, "brief": "Ganesh Chaturthi visarjan lunch, pure veg pulao, paneer and gulab jamun."}
+{"id": "brief_026", "event_type": "festival", "meal": "snacks", "rules": ["jain", "pure_veg", "no_alcohol"], "budget_inr": 16000, "brief": "Paryushan parna community gathering, Jain veg pulao and Jain paneer."}
+{"id": "brief_027", "event_type": "festival", "meal": "dinner", "rules": ["no_beef", "no_pork"], "budget_inr": 30000, "brief": "Lohri bonfire dinner with chicken tikka, dal makhani, butter naan and gulab jamun."}
+{"id": "brief_028", "event_type": "festival", "meal": "lunch", "rules": ["pure_veg", "eggless"], "budget_inr": 24000, "brief": "Onam / Pongal community harvest lunch, pure vegetarian meal for families."}
+{"id": "brief_029", "event_type": "other", "meal": "dinner", "rules": ["no_beef", "no_pork", "no_alcohol"], "budget_inr": 50000, "brief": "Silver jubilee 25th wedding anniversary dinner for 100 guests."}
+{"id": "brief_030", "event_type": "other", "meal": "lunch", "rules": ["pure_veg", "eggless"], "budget_inr": 19000, "brief": "Godh Bharai / baby shower lunch with veg biryani, paneer and sweets."}
+{"id": "brief_031", "event_type": "other", "meal": "snacks", "rules": ["no_alcohol", "no_beef", "no_pork"], "budget_inr": 15000, "brief": "Office startup launch evening snacks for 50 people."}
+{"id": "brief_032", "event_type": "other", "meal": "dinner", "rules": ["halal"], "budget_inr": 42000, "brief": "Aqiqah family dinner with mutton biryani, chicken starter and desserts."}
+{"id": "brief_033", "event_type": "other", "meal": "lunch", "rules": ["pure_veg", "no_alcohol"], "budget_inr": 21000, "brief": "Upanayanam / thread ceremony traditional pure veg lunch."}
+{"id": "brief_034", "event_type": "other", "meal": "dinner", "rules": ["no_beef"], "budget_inr": 48000, "brief": "College batch reunion dinner, mixed veg and non-veg starters and biryani."}
+{"id": "brief_035", "event_type": "other", "meal": "snacks", "rules": ["pure_veg", "eggless", "no_alcohol"], "budget_inr": 14000, "brief": "Roka ceremony high tea for two families, 40 guests."}
+{"id": "brief_036", "event_type": "wedding", "meal": "dinner", "rules": ["halal", "no_beef", "no_pork", "no_alcohol"], "budget_inr": 65000, "brief": "Interfaith reception where both sides want halal non-veg and pure veg counters."}
+{"id": "brief_037", "event_type": "wedding", "meal": "lunch", "rules": ["pure_veg"], "budget_inr": 38000, "brief": "Intimate daytime wedding lunch on a tight budget of 38k."}
+{"id": "brief_038", "event_type": "wedding", "meal": "dinner", "rules": ["jain", "no_alcohol"], "budget_inr": 52000, "brief": "Sangeet night dinner with strict Jain catering."}
+{"id": "brief_039", "event_type": "birthday", "meal": "snacks", "rules": ["vegan"], "budget_inr": 10000, "brief": "Dairy-free vegan kid birthday gathering with lime soda and rice."}
+{"id": "brief_040", "event_type": "housewarming", "meal": "lunch", "rules": ["no_beef", "no_pork"], "budget_inr": 27000, "brief": "Sunday afternoon housewarming buffet with chicken and veg biryani."}
+{"id": "brief_041", "event_type": "festival", "meal": "dinner", "rules": ["halal", "no_beef"], "budget_inr": 36000, "brief": "Iftar and dinner gathering during Ramadan with chicken biryani and lime soda."}
+{"id": "brief_042", "event_type": "wedding", "meal": "breakfast", "rules": ["pure_veg", "no_alcohol"], "budget_inr": 18000, "brief": "Early morning wedding muhurtham breakfast and beverages."}
+{"id": "brief_043", "event_type": "wedding", "meal": "dinner", "rules": ["eggless", "no_alcohol"], "budget_inr": 58000, "brief": "Reception dinner with eggless cake cutting and north Indian mains."}
+{"id": "brief_044", "event_type": "birthday", "meal": "lunch", "rules": ["pure_veg"], "budget_inr": 22000, "brief": "Family Sunday birthday lunch with paneer butter masala and butter naan."}
+{"id": "brief_045", "event_type": "other", "meal": "dinner", "rules": ["no_pork", "no_alcohol"], "budget_inr": 44000, "brief": "Retirement farewell dinner for professor, 80 guests."}
+{"id": "brief_046", "event_type": "festival", "meal": "snacks", "rules": ["pure_veg", "no_alcohol"], "budget_inr": 15000, "brief": "Navratri garba night refreshments, lime soda, water and veg snacks."}
+{"id": "brief_047", "event_type": "wedding", "meal": "dinner", "rules": ["halal", "no_beef"], "budget_inr": 120000, "brief": "Grand reception dinner with generous budget, mutton and chicken biryani."}
+{"id": "brief_048", "event_type": "wedding", "meal": "lunch", "rules": ["pure_veg", "jain", "eggless", "no_alcohol"], "budget_inr": 30000, "brief": "Simple temple wedding lunch with Jain pulao and Jain paneer."}
+{"id": "brief_049", "event_type": "birthday", "meal": "dinner", "rules": ["no_beef", "no_pork", "eggless"], "budget_inr": 26000, "brief": "Kids + parents birthday dinner with eggless cake and chicken tikka."}
+{"id": "brief_050", "event_type": "housewarming", "meal": "dinner", "rules": ["pure_veg", "no_alcohol"], "budget_inr": 25000, "brief": "Warm family dinner with fairy lights, paneer butter masala, dal makhani and naan."}
+{"id": "brief_051", "event_type": "other", "meal": "lunch", "rules": ["halal", "no_beef", "no_alcohol"], "budget_inr": 33000, "brief": "Charity fundraiser community lunch with chicken and veg biryani."}
+{"id": "brief_052", "event_type": "wedding", "meal": "dinner", "rules": ["no_alcohol"], "budget_inr": 75000, "brief": "Cocktail-free family reception with mocktails, lime soda, fish fry and mutton."}

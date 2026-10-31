@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="{{ lang or 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ t('app.name') }}{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/app.css?v={{ asset_v }}">
+  {% if include_manifest %}
+  <link rel="manifest" href="/static/manifest.webmanifest?v={{ asset_v }}">
+  {% endif %}
+  {% block head %}{% endblock %}
+</head>
+<body{% if csrf_token %} hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'{% endif %}>
+  <header class="site-header">
+    <div class="site-header__inner">
+      <a class="brand" href="/">{{ t('app.name') }}</a>
+      <nav class="nav-links" aria-label="Language and navigation">
+        {% block nav %}
+        <a class="btn btn--secondary" href="?lang=en" hreflang="en">{{ t('nav.lang.en') }}</a>
+        <a class="btn btn--secondary" href="?lang=hi" hreflang="hi">{{ t('nav.lang.hi') }}</a>
+        {% endblock %}
+      </nav>
+    </div>
+  </header>
+
+  <main id="main-content" class="container {% block container_class %}{% endblock %}">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <p>{{ t('app.footer') }} · <a href="/privacy">{{ t('app.privacy') }}</a></p>
+  </footer>
+
+  <script src="/static/vendor/htmx.min.js?v={{ asset_v }}" defer></script>
+  <script src="/static/vendor/htmx-ext-sse.js?v={{ asset_v }}" defer></script>
+  <script src="/static/vendor/alpine.min.js?v={{ asset_v }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
+

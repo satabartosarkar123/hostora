@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Host Sign-in · {{ t('app.name') }}{% endblock %}
+
+{% block content %}
+<section class="card">
+  <h1>Host Sign-in</h1>
+  <p class="muted">Sign in to manage invitations, live headcount predictions, shopping plans, and venue gate passes.</p>
+
+  <div id="login-error" class="alert alert--error" style="display:none;" aria-live="polite"></div>
+
+  <div style="display:flex; flex-direction:column; gap:0.75rem; margin-top:1.25rem;">
+    <button
+      id="google-signin-btn"
+      type="button"
+      class="btn"
+      data-api-key="{{ firebase_config.apiKey }}"
+      data-auth-domain="{{ firebase_config.authDomain }}"
+      data-project-id="{{ firebase_config.projectId }}"
+      data-app-id="{{ firebase_config.appId }}"
+    >
+      Sign in with Google
+    </button>
+
+    {% if demo_mode %}
+    <form method="post" action="/auth/demo">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" id="try-demo-btn" class="btn btn--secondary" style="width:100%;">
+        Try demo (Arjun &amp; Sara)
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="/static/js/login.js?v={{ asset_v }}"></script>
+{% endblock %}
+

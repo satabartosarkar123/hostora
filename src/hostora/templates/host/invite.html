@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Send Invites · {{ event.title }}{% endblock %}
+
+{% block container_class %}container--wide{% endblock %}
+
+{% block nav %}
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}">Dashboard</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/guests">Guests</a>
+<a class="btn btn--secondary" href="/app/e/{{ event_key }}/invite">Send Invites</a>
+<a class="btn btn--secondary" href="/app">Events</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 style="margin:0;">Send Invitations · {{ event.title }}</h1>
+    <p class="muted" style="margin:0.25rem 0 0 0;">
+      Progress: <strong id="sent-progress">{{ sent_count }} of {{ total_count }} sent</strong>
+    </p>
+  </div>
+  <a class="btn btn--secondary" href="/app/e/{{ event_key }}">Back to Dashboard</a>
+</div>
+
+<section class="card">
+  {% if invite_rows %}
+  <div class="table-wrap">
+    <table id="invites-table">
+      <thead>
+        <tr>
+          <th>Household</th>
+          <th>Typed Code</th>
+          <th>Invite Link</th>
+          <th>WhatsApp</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in invite_rows %}
+        <tr data-household-id="{{ row.household_id }}">
+          <td>
+            <strong>{{ row.display_name }}</strong>
+            <div class="muted">{{ row.seat_cap }} seats{% if row.phone_masked %} · {{ row.phone_masked }}{% endif %}</div>
+          </td>
+          <td><code>{{ row.code }}</code></td>
+          <td>
+            <a href="{{ row.link }}" class="invite-link" target="_blank" rel="noopener">{{ row.link }}</a>
+          </td>
+          <td>
+            <a
+              href="{{ row.whatsapp_url }}"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn--secondary"
+              hx-post="/app/e/{{ event_key }}/invite/{{ row.household_id }}/sent"
+              hx-target="#status-{{ row.household_id }}"
+              hx-swap="innerHTML"
+            >
+              Send on WhatsApp
+            </a>
+          </td>
+          <td id="status-{{ row.household_id }}">
+            {% if row.is_sent %}
+            <span class="badge badge--success">Sent ✓</span>
+            {% else %}
+            <form
+              method="post"
+              action="/app/e/{{ event_key }}/invite/{{ row.household_id }}/sent"
+              hx-post="/app/e/{{ event_key }}/invite/{{ row.household_id }}/sent"
+              hx-target="#status-{{ row.household_id }}"
+              hx-swap="innerHTML"
+              style="display:inline;"
+            >
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <button type="submit" class="btn btn--secondary">Mark sent</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">Add households first on the <a href="/app/e/{{ event_key }}/guests">Guests page</a>.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
