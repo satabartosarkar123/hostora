@@ -49,11 +49,21 @@ def test_grounded_eval_suite_zero_unsafe_auto_approvals() -> None:
         _expected_needs_confirm = bool(c.get("expected_needs_confirmation", False))
         ingredients = tuple(str(x) for x in c.get("ingredients", []))
         tags = frozenset(str(x) for x in c.get("tags", []))
+        absent = tuple(str(x) for x in c.get("absent", []))
 
         t0 = time.perf_counter()
 
         # Build evidence
         evidence: list[Evidence] = []
+        if absent:
+            evidence.append(
+                Evidence(
+                    source="product_label",
+                    ingredients=ingredients,
+                    absent=absent,
+                    citation="https://example.org/certified-pack",
+                )
+            )
         if tags or ingredients:
             # Knowledge base evidence
             evidence.append(

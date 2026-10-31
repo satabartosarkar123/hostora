@@ -457,3 +457,177 @@ async def test_live_llm_realistic_briefs_diverse_traditions() -> None:
             assert not (scan.tags & forbidden_tags), (
                 f"Violations for {brief}: {it.name} has {scan.tags & forbidden_tags}"
             )
+
+
+def test_grounding_negation_evals() -> None:
+    """Evaluate negation cases ('egg-free', 'eggless', Devanagari, Jain, 'alcohol-free').
+
+    Asserts:
+    1. Absence evidence allows item without the negated tag.
+    2. Contradicting evidence removes the item.
+    3. Exactly 0 unsafe auto-approvals across all cases.
+    """
+    from hostora.engine.grounding import Evidence, ProposedItem, ground
+
+    data = get_data()
+    rules = data.rules
+    vocab = get_default_vocabulary()
+
+    test_cases = [
+        # (name, category, rules, absence_ev, contradicting_ev, forbidden_substring)
+        (
+            "Egg-free Chocolate Cake",
+            "food",
+            ["pure_veg", "eggless"],
+            Evidence(
+                source="product_label",
+                ingredients=["flour", "sugar", "cocoa", "baking powder"],
+                tags={"confirmed:composition"},
+                absent=["egg"],
+                citation="certified pack label",
+            ),
+            Evidence(
+                source="product_label",
+                ingredients=["egg", "flour", "sugar", "cocoa"],
+                tags={"egg"},
+                citation="pack ingredients",
+            ),
+            "egg",
+        ),
+        (
+            "Eggless Walnut Brownie",
+            "food",
+            ["eggless"],
+            Evidence(
+                source="product_label",
+                ingredients=["flour", "cocoa", "butter", "walnut"],
+                tags={"confirmed:composition"},
+                absent=["egg"],
+                citation="pack label",
+            ),
+            Evidence(
+                source="product_label",
+                ingredients=["egg yolk", "flour", "cocoa"],
+                tags={"egg"},
+                citation="recipe ingredients",
+            ),
+            "egg",
+        ),
+        (
+            "बिना अंडे का वैनिला केक",
+            "food",
+            ["eggless"],
+            Evidence(
+                source="product_label",
+                ingredients=["मैदा", "चीनी", "वैनिला"],
+                tags={"confirmed:composition"},
+                absent=["egg"],
+                citation="pack label",
+            ),
+            Evidence(
+                source="product_label",
+                ingredients=["अंडा", "मैदा", "चीनी"],
+                tags={"egg"},
+                citation="ingredients",
+            ),
+            "egg",
+        ),
+        (
+            "No Onion No Garlic Paneer Tikka",
+            "food",
+            ["jain"],
+            Evidence(
+                source="product_label",
+                ingredients=["paneer", "curd", "coriander", "cumin"],
+                tags={"confirmed:composition"},
+                absent=["onion", "garlic", "root_veg"],
+                citation="jain certified label",
+            ),
+            Evidence(
+                source="product_label",
+                ingredients=["paneer", "garlic paste", "onion powder"],
+                tags={"garlic", "onion", "root_veg"},
+                citation="ingredients list",
+            ),
+            "garlic",
+        ),
+        (
+            "Alcohol-free Beer",
+            "beverage",
+            ["no_alcohol", "halal"],
+            Evidence(
+                source="product_label",
+                ingredients=["malted barley", "hops", "water"],
+                tags={"confirmed:composition"},
+                absent=["alcohol"],
+                citation="0.0% alcohol label",
+            ),
+            Evidence(
+                source="product_label",
+                ingredients=["malted barley", "hops", "alcohol"],
+                tags={"alcohol"},
+                citation="contains 0.5% alcohol",
+            ),
+            "alcohol",
+        ),
+        (
+            "Non-alcoholic Mojito",
+            "beverage",
+            ["no_alcohol", "halal"],
+            Evidence(
+                source="product_label",
+                ingredients=["mint", "lime", "soda", "sugar"],
+                tags={"confirmed:composition"},
+                absent=["alcohol"],
+                citation="virgin mojito label",
+            ),
+            Evidence(
+                source="product_label",
+                ingredients=["white rum", "mint", "lime"],
+                tags={"alcohol"},
+                citation="contains rum",
+            ),
+            "alcohol",
+        ),
+    ]
+
+    unsafe_auto_approvals = 0
+
+    for name, cat, rule_ids, abs_ev, contra_ev, expected_forbidden in test_cases:
+        item = ProposedItem(name=name, category=cat)
+
+        # 1. Test with absence evidence -> should be allowed
+        res_allowed = ground(
+            item=item,
+            evidence=[abs_ev],
+            vocabulary=vocab,
+            rule_ids=rule_ids,
+            rules=rules,
+            semantics=data.semantics,
+        )
+        assert res_allowed.status == "allowed", (
+            f"Expected {name} to be allowed with absence evidence, "
+            f"got {res_allowed.status} ({res_allowed.reasons})"
+        )
+
+        # 2. Test with contradicting evidence -> must be removed!
+        res_contra = ground(
+            item=item,
+            evidence=[contra_ev],
+            vocabulary=vocab,
+            rule_ids=rule_ids,
+            rules=rules,
+            semantics=data.semantics,
+        )
+        if res_contra.status == "allowed":
+            unsafe_auto_approvals += 1
+
+        assert res_contra.status == "removed", (
+            f"Expected {name} to be removed with contradicting evidence, got {res_contra.status}"
+        )
+        assert any(expected_forbidden in r.lower() for r in res_contra.reasons), (
+            f"Expected {expected_forbidden} in reasons for {name}: {res_contra.reasons}"
+        )
+
+    # 3. Strict safety metric
+    assert unsafe_auto_approvals == 0, f"Found {unsafe_auto_approvals} unsafe auto-approvals!"

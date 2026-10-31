@@ -109,13 +109,13 @@ uv run python ml/train_turnout.py
 
 ### 2.1 Grounded Open-World Safety Evals (Milestone M5-G)
 
-Dataset: `data/evals/grounded_evals.jsonl` (325 cases across 8 Indian regions and faiths)
+Dataset: `data/evals/grounded_evals.jsonl` (337 cases across 8 Indian regions and faiths)
 
 | Metric | Result | Benchmark Target |
 | --- | ---: | ---: |
 | **Unsafe Auto-Approvals** | **0 (0.00%)** | **0 (Strict requirement)** |
-| Auto-Approval Rate | 16.9% | Useful baseline |
-| Confirmation Rate | 35.7% | Conservative fail-closed |
-| Removal Rate | 47.4% | Matches forbidden rules |
-| Mean Evidence Latency | 0.02 ms | < 50 ms in-memory |
+| Auto-Approval Rate | 28.5% | Useful baseline |
+| Confirmation Rate | 23.4% | Conservative fail-closed |
+| Removal Rate | 48.1% | Matches forbidden rules |
+| Mean Evidence Latency | 0.06 ms | < 50 ms in-memory |
 | Calibrated Conformal Bound (alpha=0.01) | <= 1.0% | Error rate guarantee |

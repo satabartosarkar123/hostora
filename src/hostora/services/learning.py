@@ -418,6 +418,31 @@ def compute_newsvendor_plates(
     return round(q), basis
 
 
+async def record_portion_outcome(
+    session: AsyncSession,
+    *,
+    function_id: str,
+    serving_kind: str,
+    region: str,
+    planned_per_head: float,
+    outcome: str,
+    leftover_fraction: float = 0.0,
+) -> PortionOutcome:
+    """Record reported portion outcome (ran_short, about_right, leftover)."""
+    p_out = PortionOutcome(
+        function_id=function_id,
+        serving_kind=serving_kind,
+        region=region,
+        planned_per_head=planned_per_head,
+        outcome=outcome,
+        leftover_fraction=leftover_fraction,
+        reported_at=dt.datetime.now(dt.UTC),
+    )
+    session.add(p_out)
+    await session.flush()
+    return p_out
+
+
 async def update_portion_models(session: AsyncSession) -> int:
     """Learn log-normal per-head portion models from reported portion outcomes."""
     stmt = select(PortionOutcome)
