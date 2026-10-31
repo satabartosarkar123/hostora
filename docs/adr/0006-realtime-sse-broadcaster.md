@@ -11,4 +11,3 @@ Use Server-Sent Events (`sse-starlette`) with an in-process `Broadcaster` on a s
 
 ## Alternatives Considered
 - WebSockets or polling.
-

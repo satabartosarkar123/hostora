@@ -54,7 +54,7 @@ class ProposedItemProposal(BaseModel):
     @field_validator("price_estimate", mode="before")
     @classmethod
     def _coerce_price_estimate(cls, v: Any) -> list[float]:
-        if isinstance(v, (int, float)):
+        if isinstance(v, int | float):
             return [float(v) * 0.8, float(v) * 1.2]
         if isinstance(v, list) and v:
             if len(v) == 1:

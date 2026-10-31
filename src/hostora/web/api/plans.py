@@ -81,9 +81,8 @@ async def api_stream_plan(
                         tmpl = templates.env.get_template("host/_plan_stage.html")
                         data_str = tmpl.render(stage=payload, done_plan=None)
                     elif evt_name == "done" and isinstance(payload, Plan):
-                        plan_data = payload.model_dump(by_alias=True, mode="json")
                         tmpl = templates.env.get_template("host/_plan_stage.html")
-                        data_str = tmpl.render(stage=None, done_plan=plan_data)
+                        data_str = tmpl.render(stage=None, done_plan=payload)
                     else:
                         data_str = json.dumps(
                             payload if isinstance(payload, dict) else str(payload)

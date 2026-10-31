@@ -119,4 +119,3 @@ export async function markScansSent(seqs) {
     tx.onerror = () => reject(tx.error);
   });
 }
-

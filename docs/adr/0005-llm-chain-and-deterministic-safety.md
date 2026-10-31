@@ -12,4 +12,3 @@ Use a fallback chain: Groq (primary) -> Gemini (only when `GEMINI_ALLOWED=true` 
 
 ## Alternatives Considered
 - Letting the LLM compute quantities or output free-form dish names (unsafe and unverified).
-

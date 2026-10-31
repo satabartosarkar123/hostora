@@ -149,4 +149,3 @@ export async function verifyAsync(signature, message, publicKey) {
 
 export const verify = verifyAsync;
 export default { verifyAsync, verify };
-

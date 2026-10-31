@@ -17,7 +17,7 @@
     </div>
     <div>
       <span class="badge {% if done_plan.budget.fits %}badge--success{% else %}badge--warn{% endif %}">
-        Estimated Total: ₹{{ "{:,}".format(done_plan.budget.total_inr) }} / Limit: ₹{{ "{:,}".format(done_plan.budget.limit_inr) }}
+        Estimated Total: ₹{{ "{:,}".format(done_plan.budget.total_inr or 0) }}{% if done_plan.budget.limit_inr %} / Limit: ₹{{ "{:,}".format(done_plan.budget.limit_inr) }}{% endif %}
       </span>
     </div>
   </div>
@@ -42,7 +42,7 @@
       {% if done_plan.items %}
       <div style="display:grid; gap:1rem;">
         {% for it in done_plan.items %}
-        <div class="card" id="item-{{ it.item_id }}" style="border-left: 4px solid #16a34a; padding:0.75rem;">
+        <div class="card plan-item-card" id="item-{{ it.item_id }}" data-item-id="{{ it.item_id }}" style="border-left: 4px solid #16a34a; padding:0.75rem;">
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
               <h4 style="margin:0;">{{ it.name }} <span class="badge badge--success">Allowed</span></h4>
@@ -61,7 +61,7 @@
           {% if it.options %}
           <div style="margin-top:0.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
             {% for opt in it.options %}
-            <a class="btn btn--secondary btn--sm" href="{{ opt.url }}" target="_blank" rel="noopener">
+            <a class="btn btn--secondary btn--sm offer-link" href="{{ opt.url }}" target="_blank" rel="noopener">
               Buy on {{ opt.label }} {% if opt.inr_per_unit %}· ₹{{ opt.inr_per_unit }}/unit{% endif %}
             </a>
             {% endfor %}
@@ -137,7 +137,7 @@
     </div>
 
     <!-- Panel 3: Removed Items -->
-    <div class="card" id="panel-removed" style="background:var(--surface-alt);">
+    <div class="card" id="removed-items-panel" style="background:var(--surface-alt);">
       <h3 style="margin-top:0; color:#dc2626;">Removed Items</h3>
       {% if done_plan.removed %}
       <ul style="margin:0; padding-left:1.25rem;">

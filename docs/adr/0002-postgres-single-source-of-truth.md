@@ -12,4 +12,3 @@ Use Postgres 16+ (Neon) as the single source of truth via SQLAlchemy 2 async ORM
 
 ## Alternatives Considered
 - Distributed actors + async queue consumer (adds operational complexity and multiple state stores).
-

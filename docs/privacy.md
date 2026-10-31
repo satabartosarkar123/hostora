@@ -18,4 +18,3 @@ Hostora helps event hosts estimate attendance and plan food quantities without g
 
 - **Automatic 90-day purge**: 90 days after the last function of an event starts, all households, invitations, RSVPs, gate passes, gate scans, and idempotency records for that event are permanently deleted.
 - **Immediate account deletion**: hosts can delete their account and all associated events at any time from **Settings → Delete Account** (`DELETE /v1/me`).
-

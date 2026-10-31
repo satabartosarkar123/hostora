@@ -13,4 +13,3 @@ Build a single Python FastAPI modular monolith that serves server-rendered pages
 
 ## Alternatives Considered
 - Separate SPA frontend + backend microservice (increases bundle weight, deployment complexity, and CORS overhead).
-

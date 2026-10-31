@@ -33,4 +33,3 @@ export async function syncPendingScans(eventKey, gateToken, functionId, onSynced
     return null;
   }
 }
-

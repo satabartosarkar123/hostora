@@ -12,4 +12,3 @@ Run scheduled jobs as GitHub Actions cron workflows that call HMAC-signed `/inte
 
 ## Alternatives Considered
 - Celery / arq Beat worker (requires an extra paid instance + Redis).
-

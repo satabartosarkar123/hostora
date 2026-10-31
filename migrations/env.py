@@ -22,14 +22,18 @@ target_metadata = Base.metadata
 
 def get_db_url() -> tuple[str, dict[str, object]]:
     raw = os.environ.get("DATABASE_URL")
-    if not raw:
-        try:
-            from hostora.config import get_settings
+    try:
+        from hostora.config import get_settings
 
-            raw = get_settings().database_url
-        except Exception:
+        settings = get_settings()
+        if os.environ.get("ALEMBIC_USE_TEST_DB") == "1" and settings.test_database_url:
+            raw = settings.test_database_url
+        elif not raw:
+            raw = settings.database_url
+    except Exception:
+        if not raw:
             raw = config.get_main_option("sqlalchemy.url") or ""
-    return to_asyncpg_url(raw)
+    return to_asyncpg_url(raw or "")
 
 
 def run_migrations_offline() -> None:

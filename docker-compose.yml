@@ -13,4 +13,3 @@ services:
       retries: 20
 volumes:
   pgdata:
-

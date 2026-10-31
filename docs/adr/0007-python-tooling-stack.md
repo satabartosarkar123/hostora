@@ -11,4 +11,3 @@ Standardize on `uv` (`uv.lock`), `ruff` (lint + format), `mypy --strict`, `pytes
 
 ## Alternatives Considered
 - Poetry + Flake8 + Black.
-

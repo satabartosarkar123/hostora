@@ -192,6 +192,13 @@ def build_llm_router(
     *,
     data_version: str = "",
 ) -> LlmRouter:
+    import os
+
+    is_test = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+    is_live = os.environ.get("HOSTORA_LLM_LIVE") == "1"
+    if is_test and not is_live:
+        return LlmRouter([MockLlmClient()], cache=None, data_version=data_version)
+
     clients: list[LlmClient] = []
     if settings.groq_api_key and settings.groq_api_key.get_secret_value():
         clients.append(

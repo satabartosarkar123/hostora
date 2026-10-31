@@ -22,4 +22,3 @@ jobs:
           name: hostora-db-backup-${{ github.run_id }}
           path: hostora-backup.sql.gz.enc
           retention-days: 30
-

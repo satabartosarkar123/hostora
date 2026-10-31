@@ -57,4 +57,3 @@ export async function verifyPassToken(token, expectedEventKey, publicKeyHex, now
     exp,
   };
 }
-

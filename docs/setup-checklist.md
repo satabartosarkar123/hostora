@@ -109,4 +109,3 @@
   - **Classification:** `HF_TOKEN` is `SECRET`; Space URL is `PUBLIC`.
   - **Where it goes:** GitHub Actions Secret (`HF_TOKEN`), Hugging Face Space Settings.
   - **Cost:** Free CPU Basic Space, no credit card required.
-

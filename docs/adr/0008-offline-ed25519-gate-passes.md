@@ -12,4 +12,3 @@ Issue Ed25519-signed pass tokens (`v1.{event_key}.{pass_id}.{seats}.{exp}.{sig}`
 
 ## Alternatives Considered
 - Online-only database lookup on every QR scan (fails when venue Wi-Fi/cellular drops).
-

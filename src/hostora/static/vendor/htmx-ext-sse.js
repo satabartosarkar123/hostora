@@ -50,4 +50,3 @@
   document.addEventListener("DOMContentLoaded", scanSse);
   document.addEventListener("htmx:afterSettle", scanSse);
 })();
-

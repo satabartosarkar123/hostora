@@ -162,6 +162,45 @@ class MockLlmClient:
                         ],
                     }
                 )
+            if "paneer tikka" in dish_lower:
+                return json.dumps(
+                    {
+                        "ingredients": ["paneer", "spices", "salt"],
+                        "sources": [
+                            {
+                                "url": "https://example.org/paneer-tikka",
+                                "quote": "Paneer tikka is marinated with paneer, spices and salt.",
+                            }
+                        ],
+                    }
+                )
+            if "butter naan" in dish_lower:
+                return json.dumps(
+                    {
+                        "ingredients": ["flour", "butter", "salt"],
+                        "sources": [
+                            {
+                                "url": "https://example.org/butter-naan",
+                                "quote": "Butter naan is rolled from flour, butter and salt.",
+                            }
+                        ],
+                    }
+                )
+            if "gulab jamun" in dish_lower:
+                return json.dumps(
+                    {
+                        "ingredients": ["milk", "sugar", "cardamom"],
+                        "sources": [
+                            {
+                                "url": "https://example.org/gulab-jamun",
+                                "quote": (
+                                    "Gulab jamun is soaked in syrup made with "
+                                    "milk solids, sugar and cardamom."
+                                ),
+                            }
+                        ],
+                    }
+                )
             if "fresh lime soda" in dish_lower or "lime soda" in dish_lower:
                 return json.dumps(
                     {
@@ -329,6 +368,18 @@ class MockLlmClient:
         else:
             items = [
                 {
+                    "name": "Paneer Tikka",
+                    "local_names": ["पनीर टिक्का"],
+                    "category": "food",
+                    "course": "starter",
+                    "serving_kind": "starter_piece",
+                    "ingredients": ["paneer", "spices", "salt"],
+                    "declared_diet": "veg",
+                    "why": "Spiced grilled cottage cheese skewers",
+                    "search_query": "paneer tikka",
+                    "price_estimate": [0.30, 0.50],
+                },
+                {
                     "name": "Tomato Rice",
                     "local_names": ["Tamatar Chawal"],
                     "category": "food",
@@ -353,6 +404,30 @@ class MockLlmClient:
                     "price_estimate": [0.25, 0.45],
                 },
                 {
+                    "name": "Butter Naan",
+                    "local_names": ["बटर नान"],
+                    "category": "food",
+                    "course": "bread",
+                    "serving_kind": "bread_piece",
+                    "ingredients": ["flour", "butter", "salt"],
+                    "declared_diet": "veg",
+                    "why": "Soft tandoor baked butter bread",
+                    "search_query": "butter naan",
+                    "price_estimate": [0.15, 0.25],
+                },
+                {
+                    "name": "Gulab Jamun",
+                    "local_names": ["गुलाब जामुन"],
+                    "category": "food",
+                    "course": "dessert",
+                    "serving_kind": "sweet_piece",
+                    "ingredients": ["milk", "sugar", "cardamom"],
+                    "declared_diet": "veg",
+                    "why": "Classic warm milk solid sweet in sugar syrup",
+                    "search_query": "gulab jamun",
+                    "price_estimate": [0.20, 0.35],
+                },
+                {
                     "name": "Fresh Lime Soda",
                     "local_names": ["नींबू सोडा"],
                     "category": "beverage",
@@ -370,7 +445,7 @@ class MockLlmClient:
         if "pork" in user_lower:
             items.append(
                 {
-                    "name": "Pork Ribs",
+                    "name": "Pork ribs",
                     "local_names": [],
                     "category": "food",
                     "course": "starter",

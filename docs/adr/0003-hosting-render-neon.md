@@ -12,4 +12,3 @@ Deploy the Docker container to Render's free web service (Singapore region) back
 
 ## Alternatives Considered
 - Render free Postgres (expires after 30 days) or Cloud Run (requires billing card).
-

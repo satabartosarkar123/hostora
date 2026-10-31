@@ -19,4 +19,3 @@ ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 PORT=8000
 USER app
 EXPOSE 8000
 CMD ["sh", "-c", "alembic upgrade head && exec uvicorn --factory hostora.main:create_app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*' --no-server-header"]
-

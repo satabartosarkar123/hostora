@@ -77,4 +77,3 @@ sequenceDiagram
         W-->>G: 200 OK / 303 Redirect to Done Page
     end
 ```
-

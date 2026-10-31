@@ -6,4 +6,3 @@
   }
   global.jsQR = jsQR;
 })(typeof window !== "undefined" ? window : globalThis);
-
