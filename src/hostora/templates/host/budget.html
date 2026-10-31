@@ -52,23 +52,23 @@ function moveCategory(cat, delta) {
   if (idx < 0) return;
   const newIdx = idx + delta;
   if (newIdx < 0 || newIdx >= items.length) return;
-  
+
   const winner = delta < 0 ? cat : items[newIdx].getAttribute("data-cat");
   const loser = delta < 0 ? items[newIdx].getAttribute("data-cat") : cat;
-  
+
   if (delta < 0) {
     container.insertBefore(items[idx], items[newIdx]);
   } else {
     container.insertBefore(items[newIdx], items[idx]);
   }
-  
+
   // Re-number
   Array.from(container.children).forEach((el, i) => {
     const nameSpan = el.querySelector("span");
     const cName = el.getAttribute("data-cat");
     nameSpan.textContent = (i + 1) + ". " + cName;
   });
-  
+
   fetch('/app/e/{{ event_key }}/budget/preference', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},

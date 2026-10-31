@@ -324,3 +324,95 @@ def test_absence_never_overrides_an_asserted_ingredient() -> None:
         Evidence("host", absent=frozenset({"chicken", "meat"})),
     ]
     assert ground(item, claims, VOCAB, ["pure_veg"], RULES).status == "removed"
+
+
+# ---------------------------------------------------------------- validation & error edge cases
+
+
+def test_turnout_error_cases() -> None:
+    from hostora.engine.turnout import BetaRate
+
+    with pytest.raises(ValueError, match="Beta parameters must be positive"):
+        BetaRate(-1, 1)
+    with pytest.raises(ValueError, match="strength must be positive"):
+        prior_from_rate(0.8, -1)
+    with pytest.raises(ValueError, match="rate must be strictly between 0 and 1"):
+        prior_from_rate(0.0, 10)
+    with pytest.raises(ValueError, match="draws must be positive"):
+        simulate_arrivals([], {}, draws=0)
+    with pytest.raises(ValueError, match="seats and households must be non-negative"):
+        simulate_arrivals([HouseholdGroup("yes", -1, 5)], {"yes": prior_from_rate(0.9, 10)})
+    with pytest.raises(KeyError, match="no rate for status 'unknown'"):
+        simulate_arrivals([HouseholdGroup("unknown", 2, 5)], {"yes": prior_from_rate(0.9, 10)})
+    with pytest.raises(ValueError, match="no samples"):
+        quantile([], 0.5)
+    with pytest.raises(ValueError, match=r"q must be in \[0, 1\]"):
+        quantile([10, 20], 1.5)
+    rate = prior_from_rate(0.8, 10)
+    assert rate.strength == pytest.approx(10.0)
+
+
+def test_newsvendor_error_cases() -> None:
+    with pytest.raises(ValueError, match="costs must be positive"):
+        critical_ratio(-1, 1)
+    with pytest.raises(ValueError, match="no samples"):
+        expected_cost([], 10, 1, 1)
+
+
+def test_bandit_error_cases() -> None:
+    with pytest.raises(ValueError, match="counts must be non-negative"):
+        ArmStats(successes=-1)
+    with pytest.raises(ValueError, match="strength must be positive"):
+        rank_arms(["shop_a"], {}, {}, 0, random.Random(1))
+
+
+def test_portions_and_bayes_error_cases() -> None:
+    from hostora.engine.portions import (
+        Observation,
+        ServingKind,
+        implied_demand,
+        posterior_portion,
+        units_per_guests,
+    )
+
+    with pytest.raises(ValueError, match="not counted per guests"):
+        units_per_guests(
+            ServingKind(
+                id="food",
+                course="main",
+                per_adult=100.0,
+                per_child=50.0,
+                unit="g",
+                pack_sizes=(1,),
+                basis="test",
+                per_guests=None,
+            ),
+            10,
+        )
+    with pytest.raises(ValueError, match="planned_per_head must be non-negative"):
+        implied_demand(Observation(planned_per_head=-5.0, outcome="ran_short"))
+    with pytest.raises(ValueError, match="leftover_fraction must be between 0 and 1"):
+        implied_demand(
+            Observation(planned_per_head=100.0, outcome="leftover", leftover_fraction=1.5)
+        )
+    with pytest.raises(ValueError, match="prior and prior_weight must be positive"):
+        posterior_portion(0.0, 1.0, [])
+
+    with pytest.raises(ValueError, match="observations must be positive"):
+        Obs("exact", -5.0)
+    with pytest.raises(ValueError, match="between needs high > low"):
+        Obs("between", 10.0, 5.0)
+    with pytest.raises(ValueError, match="prior_median and standard deviations must be positive"):
+        lognormal_posterior(0.0, 0.2, 0.2, [])
+    with pytest.raises(ValueError, match="grid too small"):
+        lognormal_posterior(100.0, 0.2, 0.2, [], grid=2)
+    with pytest.raises(ValueError, match="planned_per_head must be positive"):
+        outcome_to_obs(0.0, "ran_short")
+    with pytest.raises(ValueError, match=r"leftover_fraction must be in \[0, 1\)"):
+        outcome_to_obs(100.0, "leftover", leftover_fraction=1.5)
+    with pytest.raises(ValueError, match=r"right_tolerance must be in \(0, 1\)"):
+        outcome_to_obs(100.0, "about_right", right_tolerance=1.5)
+    with pytest.raises(ValueError, match="unknown outcome 'bad_outcome'"):
+        outcome_to_obs(100.0, "bad_outcome")
+    with pytest.raises(ValueError, match="standard deviations must be positive"):
+        learn_elasticity(0.65, -0.1, 0.1, [])

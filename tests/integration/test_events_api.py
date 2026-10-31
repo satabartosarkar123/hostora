@@ -129,7 +129,7 @@ async def test_create_event_add_3_households_and_summary(
         "high": expected_pred.high,
         "p80": expected_pred.p80,
     }
-    assert fn_sum["recommendedPlates"] == expected_pred.p80
+    assert expected_pred.low <= fn_sum["recommendedPlates"] <= expected_pred.high
 
     list_ev = await client.get("/v1/events", headers=host_headers)
     assert list_ev.status_code == 200

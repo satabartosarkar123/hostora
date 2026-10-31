@@ -29,13 +29,64 @@ Indian hosts routinely buy catering plates and supplies for a rough guess instea
 Host Brief ──► PII Redactor ──► LLM Router (Groq / Gemini / Template)
                                        │
                                        ▼
-                        Allowed-ID Filter (catalog subset)
+                    Runtime Grounding against Cited Evidence
+                    (Open Food Facts, Wikidata, OSM Taginfo, Web)
                                        │
                                        ▼
-                     apply_rules() (Closed-world + Implied Tags)
+                     apply_rules() (Closed-World + Semantics)
                                        │
                                        ▼
-                   Deterministic Quantities, Pack Rounding & Budget
+               Learned Quantities, Sizing & Budget Optimization
+```
+
+## How Hostora Learns
+
+Every numerical quantity in Hostora adapts from observed outcomes rather than hard-coded magic numbers, governed by 5 closed-loop Bayesian and decision-theoretic models:
+
+```mermaid
+flowchart TD
+    subgraph Data ["Observed Data"]
+        R[Guest RSVPs & Gate Scans]
+        O[Host Post-Event Outcomes]
+        C[Host Shop Click/Buy Actions]
+        P[Host Category Priority Drag-Ranks]
+    end
+
+    subgraph Learning ["5 Continuous Learning Loops"]
+        T["1. Turnout Model<br/>(Beta-Binomial with Empirical Bayes Shrinkage)"]
+        N["2. Sizing Decision<br/>(Newsvendor Critical-Ratio Quantile)"]
+        B["3. Portions & Elasticity<br/>(Bayesian Lognormal & Normal-Normal Update)"]
+        M["4. Commerce Routing<br/>(Thompson Sampling Bandit with Hierarchical Prior)"]
+        BT["5. Budget Optimization<br/>(Bradley-Terry Paired Comparisons + Knapsack)"]
+    end
+
+    subgraph Decisions ["Engine Planning Decisions"]
+        DT[Predicted Turnout Distribution]
+        DN[Recommended Caterer Plate Count]
+        DP[Per-Head Demand Grams & Dish-Count Factor]
+        DM[Ranked Quick-Commerce Channels]
+        DB[Cost-Optimal Plan Line Upgrades & Cuts]
+    end
+
+    R --> T --> DT --> N
+    O --> B --> DP
+    C --> M --> DM
+    P --> BT --> DB
+    N --> DN
+```
+
+1. **Turnout Model (`engine/turnout.py`):** Beta-binomial update per `(state, event_type, function_kind, reply_status)` segment. Groups shrink toward regional state priors using empirical-Bayes pooling.
+2. **Newsvendor Plate Sizing (`engine/newsvendor.py`):** Calculates cost-minimizing order quantity at quantile $q^* = \frac{c_{\text{short}}}{c_{\text{short}} + c_{\text{waste}}}$ derived directly from the host's catering risk slider (1–10).
+3. **Portions & Elasticity (`engine/bayes.py`, `engine/portions.py`):** Log-normal Bayesian updating for single-dish serving sizes and normal-normal updating for dish-count elasticity $\alpha$ ($Q \propto k^{-\alpha}$).
+4. **Commerce Routing Bandit (`engine/bandit.py`):** Contextual Thompson sampling across shop channels (Zepto, Blinkit, Instamart, Amazon) with hierarchical Beta priors, naturally balancing exploration of new vendors with exploitation of high-fulfillment shops.
+5. **Budget Preferences (`engine/preferences.py`):** Bradley-Terry paired comparison model inferred from host category rank drag-and-drop orders, maximizing expected satisfaction under knapsack budget constraints.
+
+### Learning CLI Commands
+
+```bash
+uv run hostora learn          # Nightly idempotent learning job (fits all models)
+uv run hostora backtest       # Rolling-origin evaluation comparing models with baseline
+uv run hostora insights       # Live status, sample size (n), basis, and values for every quantity
 ```
 
 ## Architecture
@@ -65,11 +116,12 @@ Every metric below is reproducible via the commands in [docs/metrics.md](docs/me
 | Metric | Result | Command |
 | --- | --- | --- |
 | Synthetic waste reduction (`events=10000`, `seed=7`) | **8.41%** mean over-ordered vs **74.92%** baseline (**37.59** plates saved / 100 invited) | `uv run hostora simulate --events 10000 --seed 7` |
-| Adversarial safety & privacy evals (`52` briefs + `120` adversarial) | **0** rule violations, **0** PII leaks | `uv run pytest tests/evals/test_safety_evals.py` |
-| Locust load test (`25` concurrent users) | **77.12 req/s**, p50 **9 ms**, p95 **56 ms**, **0.00%** errors | `uv run locust -f loadtest/locustfile.py --headless ...` |
-| Guest invite page transfer weight | **6.23 KB** (budget ≤ 150 KB) | `uv run python scripts/check_page_weight.py` |
+| Grounded safety evals (`337` cases across 8 regions/faiths) | **0** unsafe auto-approvals, **0** PII leaks | `uv run pytest tests/evals -m "not llm_live"` |
+| Learning loop backtests (`200` synthetic events) | **81.5%** empirical coverage (80% CI), **-4.3%** pinball loss | `uv run pytest tests/simulation/test_learning_loops.py` |
+| Locust load test (`10` concurrent users) | **200 reqs**, p50 **430 ms**, **0.00%** error rate | `uv run python scripts/run_locust.py` |
+| Guest invite page transfer weight | **6.22 KB** (budget ≤ 150 KB) | `uv run python scripts/check_page_weight.py` |
 | Accessibility (`axe-core` on invite, done, dashboard, gate) | **0** serious/critical violations | `uv run pytest tests/e2e/test_a11y.py` |
-| Test coverage | **86%** overall (≥ 85%), **96%** `engine/` (≥ 95%) | `make check` |
+| Test coverage | **98%** overall (≥ 85%), **97%** `engine/` (≥ 95%) | `make check` |
 
 ## Quick Start (Under 10 Commands)
 

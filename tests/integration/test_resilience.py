@@ -84,6 +84,12 @@ async def test_resilience_groq_429_or_timeout_falls_back_to_template(
         plan_id = plan_ref["planId"]
 
         app = create_app(settings)
+        from hostora.adapters.llm.groq import GroqClient
+        from hostora.adapters.llm.router import LlmRouter
+
+        app.state.llm_router = LlmRouter(
+            [GroqClient(api_key="gsk_mock_resilience", model="mock")], cache=None
+        )
         final_plan: Plan | None = None
         async for ev_type, payload in run_planner_stream(
             db,

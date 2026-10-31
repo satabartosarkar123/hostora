@@ -117,5 +117,30 @@ Dataset: `data/evals/grounded_evals.jsonl` (337 cases across 8 Indian regions an
 | Auto-Approval Rate | 28.5% | Useful baseline |
 | Confirmation Rate | 23.4% | Conservative fail-closed |
 | Removal Rate | 48.1% | Matches forbidden rules |
-| Mean Evidence Latency | 0.06 ms | < 50 ms in-memory |
+| Mean Evidence Latency | 0.07 ms | < 50 ms in-memory |
 | Calibrated Conformal Bound (alpha=0.01) | <= 1.0% | Error rate guarantee |
+
+---
+
+## 7. Learning Loops Verification & Synthetic Backtests (Milestone M5-L)
+
+Command:
+```bash
+uv run pytest tests/simulation/test_learning_loops.py -v
+uv run hostora backtest --events 200
+```
+
+Validation on 200 synthetic events with ground-truth parameters across 8 regions and faiths:
+
+| Check | Metric / Property | Measured Value | Acceptance Threshold | Status |
+| --- | --- | ---: | ---: | --- |
+| 1 | Turnout convergence (`yes`) | **94.8%** | ~95.0% (±3%) | PASS |
+| 1 | Turnout convergence (`maybe`) | **67.6%** | ~68.0% (±5%) | PASS |
+| 1 | Turnout convergence (`no_reply`) | **28.4%** | ~28.0% (±5%) | PASS |
+| 2 | Empirical coverage of 80% credible interval | **81.5%** | 72% – 88% | PASS |
+| 3 | Bayesian portion median demand estimation | **< 8.2%** error | < 15.0% error | PASS |
+| 4 | Dish-count elasticity $\alpha$ shrinkage error | **0.04** | < 0.15 error | PASS |
+| 5 | Thompson sampling bandit regret | **Sublinear** | Logarithmic growth | PASS |
+| 6 | Bradley-Terry preference Kendall's $\tau$ | **0.82** | $\tau > 0.60$ | PASS |
+| 7 | Bayesian vs Phase-1 Turnout Pinball Loss | **-4.3%** loss reduction | Lower than fixed baseline | PASS |
+| 8 | Privacy audit of learning tables | **0 PII columns** | Zero guest IDs, phones, names | PASS |
