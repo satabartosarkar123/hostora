@@ -1,0 +1,11 @@
+# Search URL patterns. {q} is replaced with the URL-encoded search query.
+# VERIFY EACH PATTERN IN M5 by opening it in a browser. Fix here, never in code.
+# Phase A: no affiliate parameters.
+channels:
+  blinkit:     { label: Blinkit,          kind: quick,     search: "https://blinkit.com/s/?q={q}" }
+  zepto:       { label: Zepto,            kind: quick,     search: "https://www.zeptonow.com/search?query={q}" }
+  instamart:   { label: Swiggy Instamart, kind: quick,     search: "https://www.swiggy.com/instamart/search?query={q}" }
+  swiggy_food: { label: Swiggy,           kind: food,      search: "https://www.swiggy.com/search?query={q}" }
+  zomato:      { label: Zomato,           kind: food,      search: "https://www.zomato.com/search?q={q}" }
+  amazon:      { label: Amazon,           kind: ecommerce, search: "https://www.amazon.in/s?k={q}" }
+  flipkart:    { label: Flipkart,         kind: ecommerce, search: "https://www.flipkart.com/search?q={q}" }

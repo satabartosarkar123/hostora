@@ -1,0 +1,27 @@
+# Dietary and faith rule sets. Each forbids catalog tags (after implied tags are expanded).
+# Must match RuleId in packages/schema. The host chooses rules; templates never set them.
+rules:
+  halal:
+    label: Halal
+    forbid: [pork, alcohol, meat_unverified_halal]
+  jain:
+    label: Jain
+    forbid: [meat, fish, egg, root_veg, onion, garlic]
+  pure_veg:
+    label: Pure vegetarian
+    forbid: [meat, fish, egg]
+  no_beef:
+    label: No beef
+    forbid: [beef]
+  no_pork:
+    label: No pork
+    forbid: [pork]
+  no_alcohol:
+    label: No alcohol
+    forbid: [alcohol]
+  eggless:
+    label: Eggless
+    forbid: [egg]
+  vegan:
+    label: Vegan
+    forbid: [meat, fish, egg, allergen:dairy, honey]

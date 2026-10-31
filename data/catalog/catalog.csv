@@ -1,0 +1,25 @@
+id,name,category,course,unit,pack_sizes,tags,est_price_inr_per_unit,search_query,popularity
+chicken_biryani,Chicken biryani,food,main,g,1000|2000,declared diet:nonveg chicken allergen:dairy,0.45,chicken biryani,9
+mutton_biryani,Mutton biryani,food,main,g,1000|2000,declared diet:nonveg mutton allergen:dairy,0.7,mutton biryani,8
+veg_biryani,Veg biryani,food,main,g,1000|2000,declared diet:veg onion allergen:dairy,0.3,veg biryani,7
+jain_veg_pulao,Jain veg pulao,food,main,g,1000|2000,declared diet:veg allergen:dairy,0.3,jain pulao,5
+paneer_butter_masala,Paneer butter masala,food,side,g,500|1000,declared diet:veg onion allergen:dairy,0.5,paneer butter masala,8
+jain_paneer_masala,Jain paneer masala,food,side,g,500|1000,declared diet:veg allergen:dairy,0.55,jain paneer sabzi,4
+dal_makhani,Dal makhani,food,side,g,500|1000,declared diet:veg onion garlic allergen:dairy,0.25,dal makhani,7
+chicken_tikka,Chicken tikka,food,starter,g,500|1000,declared diet:nonveg chicken allergen:dairy,0.6,chicken tikka,8
+hara_bhara_kebab,Hara bhara kebab,food,starter,piece,12|24,declared diet:veg potato,15,hara bhara kebab,6
+fish_fry,Fish fry,food,starter,g,500|1000,declared diet:nonveg fish,0.8,fish fry,6
+pork_ribs,Pork ribs,food,main,g,500|1000,declared diet:nonveg pork,0.9,pork ribs,3
+beef_roast,Beef roast,food,main,g,500|1000,declared diet:nonveg beef,0.7,beef roast,3
+butter_naan,Butter naan,food,bread,piece,10|20,declared diet:veg allergen:gluten allergen:dairy,12,butter naan,8
+jeera_rice,Jeera rice,food,rice,g,1000|2000,declared diet:veg,0.15,jeera rice,7
+gulab_jamun,Gulab jamun,food,dessert,piece,20|50,declared diet:veg allergen:dairy allergen:gluten,8,gulab jamun,9
+eggless_cake,Eggless cake,food,dessert,g,1000|2000,declared diet:veg allergen:gluten allergen:dairy,0.8,eggless cake,7
+soft_drinks,Soft drinks,beverage,drink,ml,750|2000,declared diet:veg,0.05,soft drinks 2 litre,8
+mineral_water,Mineral water,beverage,drink,ml,1000|2000,declared diet:veg,0.02,mineral water 2 litre,9
+fresh_lime_soda,Fresh lime soda,beverage,drink,ml,1000,declared diet:veg,0.08,lime soda,5
+wine,Wine,beverage,drink,ml,750,declared diet:veg wine,1.5,wine,2
+ice,Ice,supply,supply,g,1000|2000,,0.03,ice cubes,6
+paper_plates,Disposable plates,tableware,supply,piece,50|100,,2.5,disposable plates,8
+fairy_lights,Fairy lights,lighting,decor,piece,1,,450,fairy lights,6
+balloon_kit,Balloon decor kit,decor,decor,piece,1,,499,balloon decoration kit,6

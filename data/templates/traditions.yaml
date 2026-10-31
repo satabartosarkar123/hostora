@@ -1,0 +1,37 @@
+# Function-name templates only. They never set dietary rules; the host chooses rules.
+# The host can rename, add or remove any function.
+traditions:
+  none:
+    label: No template
+    functions: [Main event]
+  civil:
+    label: Civil or registered wedding
+    functions: [Registration, Reception]
+  hindu_north:
+    label: Hindu (North Indian)
+    functions: [Haldi, Mehendi, Sangeet, Wedding, Reception]
+  bengali_hindu:
+    label: Bengali Hindu
+    functions: [Aiburobhat, Gaye Holud, Biye, Bou Bhat]
+  muslim:
+    label: Muslim
+    functions: [Mehendi, Nikah, Walima]
+  christian:
+    label: Christian
+    functions: [Engagement, Church service, Reception]
+  sikh:
+    label: Sikh
+    functions: [Anand Karaj, Reception]
+  interfaith:
+    label: Interfaith
+    functions: [Ceremony, Reception]
+  birthday:
+    label: Birthday party
+    functions: [Party]
+  housewarming:
+    label: Housewarming
+    functions: [Puja or blessing, Lunch]
+
+invite_text:
+  en: "{host} invites you to {event}. Please reply here: {link} (code {code})"
+  hi: "{host} आपको {event} में आमंत्रित करते हैं। कृपया यहाँ जवाब दें: {link} (कोड {code})"
