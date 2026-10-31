@@ -1,12 +1,16 @@
-# Dietary and faith rule sets. Each forbids catalog tags (after implied tags are expanded).
-# Must match RuleId in packages/schema. The host chooses rules; templates never set them.
+# Diet and faith rule definitions. The host chooses which rules apply to each function and may
+# adjust them per event (families differ). Tags are matched against evidence gathered at runtime
+# (AGENTS.md section 23); the engine expands implied tags (chicken -> meat, wine -> alcohol, ...).
+# "confirm" lists tags that are allowed only after the host (or a product label) confirms.
 rules:
   halal:
     label: Halal
-    forbid: [pork, alcohol, meat_unverified_halal]
+    forbid: [pork, alcohol]
+    confirm:
+      meat: "Confirm the meat comes from a halal-certified supplier."
   jain:
     label: Jain
-    forbid: [meat, fish, egg, root_veg, onion, garlic]
+    forbid: [meat, fish, egg, root_veg, onion, garlic, honey, alcohol]
   pure_veg:
     label: Pure vegetarian
     forbid: [meat, fish, egg]
@@ -24,4 +28,4 @@ rules:
     forbid: [egg]
   vegan:
     label: Vegan
-    forbid: [meat, fish, egg, allergen:dairy, honey]
+    forbid: [meat, fish, egg, allergen:dairy, honey, animal_product]

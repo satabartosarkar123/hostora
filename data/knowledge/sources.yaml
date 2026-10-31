@@ -1,0 +1,36 @@
+# Live knowledge sources used to ground AI-proposed items (AGENTS.md section 23).
+# Verify every endpoint, parameter and licence term at build time; fix them here, not in code.
+version: 1
+
+open_food_facts:
+  taxonomy_url: "https://static.openfoodfacts.org/data/taxonomies/ingredients.json"
+  product_search_url: "https://world.openfoodfacts.org/api/v2/search"
+  product_url: "https://world.openfoodfacts.org/api/v2/product/{code}"
+  user_agent: "Hostora/1.0 (non-commercial; contact in /privacy)"   # OFF asks for an identifying User-Agent
+  refresh_days: 7
+  licence: "ODbL; attribute Open Food Facts wherever its data is shown"
+
+wikidata:
+  sparql_url: "https://query.wikidata.org/sparql"
+  user_agent: "Hostora/1.0 (non-commercial; contact in /privacy)"
+  properties:
+    made_from_material: P186
+    has_part: P527
+  label_languages: [en, hi, bn, ta, te, mr, gu, kn, ml, pa, ur]
+  refresh_days: 30
+
+web_grounding:
+  # Search-grounded extraction: the model must return quotes with URLs; uncited claims are dropped.
+  providers: [groq_browser_search, gemini_google_search]   # in order; verify availability and free limits
+  max_sources_per_item: 3
+  refresh_days: 30
+
+store_products:
+  swiggy_instamart_mcp: { enabled: false }   # turn on once Builders Club production access is granted
+
+policy:
+  quorum: 2                  # independent source families that must explain an item
+  require_non_model: true    # at least one of them is not an AI model
+  verifier_samples: 3        # independent verifier answers per item (agreement score)
+  min_agreement: 0.67        # replaced by the calibrated value (hostora calibrate)
+  alpha: 0.01                # target: at most 1% unsafe auto-approvals, with a conformal bound

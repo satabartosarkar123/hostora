@@ -1,0 +1,61 @@
+# Bridge from live knowledge-source concepts to Hostora rule tags.
+#
+# This is NOT a list of foods. It defines what each rule tag means in terms of broad concepts in
+# open knowledge bases. Any food those sources know about (thousands of ingredients, in many
+# languages) inherits tags through its parent concepts at runtime, e.g.
+#   "en:chicken-thigh" -> "en:chicken" -> "en:poultry" -> "en:meat"   gives  [chicken, meat]
+# The vocabulary used for scanning text is built from the sources' names and synonyms, cached
+# in the knowledge_concept table and refreshed on a schedule (AGENTS.md section 23).
+#
+# Verify every concept id against the live Open Food Facts ingredients taxonomy at build time;
+# a test fails if an id here does not exist in the fetched taxonomy.
+version: 1
+
+open_food_facts_parents:
+  "en:meat": [meat]
+  "en:poultry": [meat]
+  "en:chicken": [chicken]
+  "en:pork": [pork]
+  "en:beef": [beef]
+  "en:lamb": [mutton]
+  "en:mutton": [mutton]
+  "en:goat-meat": [mutton]
+  "en:gelatin": [meat, pork, beef]          # source animal unknown: assume the worst
+  "en:fish": [fish]
+  "en:seafood": [fish]
+  "en:crustacean": [fish]
+  "en:mollusc": [fish]
+  "en:egg": [egg]
+  "en:milk": [dairy, allergen:dairy]
+  "en:dairy": [dairy, allergen:dairy]
+  "en:honey": [honey]
+  "en:onion": [onion]
+  "en:garlic": [garlic]
+  "en:potato": [root_veg]
+  "en:carrot": [root_veg]
+  "en:root-vegetable": [root_veg]
+  "en:ginger": [root_veg]
+  "en:alcohol": [alcohol]
+  "en:wine": [alcohol]
+  "en:beer": [alcohol]
+  "en:spirit": [alcohol]
+
+# Open Food Facts per-ingredient properties (values yes / no / maybe). "no" or "maybe" adds the
+# tags below, so an unclear ingredient is treated as the stricter case.
+open_food_facts_properties:
+  "vegetarian:en":
+    no: [meat, fish]
+    maybe: [meat, fish]
+  "vegan:en":
+    no: [animal_product]
+    maybe: [animal_product]
+
+# Grammar, not food: phrases that cancel a tag inside the same text ("eggless cake").
+# A text that both cancels and asserts a tag ("eggless egg cake") goes to the host.
+negations:
+  - cancels: [egg]
+    forms: [eggless, egg free, egg-free, without egg, no egg, बिना अंडे, बिना अंडा]
+  - cancels: [onion, garlic]
+    forms: [no onion no garlic, without onion and garlic, बिना प्याज लहसुन]
+  - cancels: [alcohol]
+    forms: [non alcoholic, non-alcoholic, alcohol free, alcohol-free, mocktail]
