@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select, text
 
 from hostora.db.models import Event
+from hostora.engine.newsvendor import order_quantity
 from hostora.engine.prediction import ReplySeats, predict_arrivals
 from hostora.errors import ProblemError
 from hostora.schemas.common import Meal
@@ -16,6 +17,7 @@ from hostora.schemas.summary import (
     PredictionOut,
     SeatCounts,
 )
+from hostora.services.learning import slider_to_cost_ratio
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -113,7 +115,16 @@ async def get_event_summary(session: AsyncSession, event_key: str) -> EventSumma
                     high=pred.high,
                     p80=pred.p80,
                 ),
-                recommended_plates=pred.p80,
+                recommended_plates=(
+                    round(
+                        order_quantity(
+                            [pred.low + int((pred.high - pred.low) * (i / 49)) for i in range(50)],
+                            *slider_to_cost_ratio(getattr(event, "short_waste_slider", 5)),
+                        )
+                    )
+                    if pred.likely > 0
+                    else pred.p80
+                ),
                 arrivals=arrivals,
                 possible_duplicates=possible_duplicates,
                 unknown_passes=unknown_passes,

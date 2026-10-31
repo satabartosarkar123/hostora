@@ -17,6 +17,8 @@ def test_real_data_loads() -> None:
     assert "meat" in bundle.confirm.get("halal", {})
     assert len(bundle.channels) == 7
     assert len(bundle.semantics.substance_tags) >= 5
+    assert len(bundle.tuning) >= 15
+    assert "min_backtest_events" in bundle.tuning
     assert len(bundle.concept_map.get("open_food_facts_parents", {})) >= 20
     assert "open_food_facts" in bundle.sources
 

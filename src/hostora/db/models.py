@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import (
     CHAR,
     BigInteger,
@@ -54,6 +55,9 @@ class Event(Base):
     venue_lng: Mapped[float] = mapped_column(Double, nullable=False)
     pincode: Mapped[str | None] = mapped_column(CHAR(6), nullable=True)
     budget_inr: Mapped[int] = mapped_column(Integer, nullable=False)
+    short_waste_slider: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("5")
+    )
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     purge_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     purged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -63,6 +67,10 @@ class Event(Base):
 
     __table_args__ = (
         CheckConstraint("budget_inr >= 0", name="event_budget_inr_check"),
+        CheckConstraint(
+            "short_waste_slider >= 1 AND short_waste_slider <= 10",
+            name="event_short_waste_slider_check",
+        ),
         Index("event_host_idx", host_uid, created_at.desc()),
         Index("event_purge_idx", purge_after, postgresql_where=text("purged_at IS NULL")),
     )
@@ -436,3 +444,190 @@ class GroundingPolicy(Base):
     n_calibration: Mapped[int] = mapped_column(Integer, nullable=False)
     risk_bound: Mapped[float] = mapped_column(Double, nullable=False)
     calibrated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class TurnoutObservation(Base):
+    __tablename__ = "turnout_observation"
+    __table_args__ = (
+        Index("turnout_obs_segment_idx", "state", "event_type", "function_kind", "reply_bucket"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    function_id: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(Text, nullable=False)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    function_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    reply_bucket: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    invited_households: Mapped[int] = mapped_column(Integer, nullable=False)
+    arrived_households: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    weight: Mapped[float] = mapped_column(Double, nullable=False, server_default=text("1.0"))
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class TurnoutModel(Base):
+    __tablename__ = "turnout_model"
+    __table_args__ = (
+        UniqueConstraint("segment_key", "status", name="uq_turnout_model_segment_status"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    segment_key: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    a: Mapped[float] = mapped_column(Double, nullable=False)
+    b: Mapped[float] = mapped_column(Double, nullable=False)
+    strength: Mapped[float] = mapped_column(Double, nullable=False)
+    n: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class PortionModel(Base):
+    __tablename__ = "portion_model"
+    __table_args__ = (
+        UniqueConstraint("serving_kind", "region", name="uq_portion_model_kind_region"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    serving_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    region: Mapped[str] = mapped_column(Text, nullable=False)
+    median: Mapped[float] = mapped_column(Double, nullable=False)
+    p10: Mapped[float] = mapped_column(Double, nullable=False)
+    p90: Mapped[float] = mapped_column(Double, nullable=False)
+    n: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ElasticityModel(Base):
+    __tablename__ = "elasticity_model"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    course: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    mean: Mapped[float] = mapped_column(Double, nullable=False)
+    sd: Mapped[float] = mapped_column(Double, nullable=False)
+    n: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ChannelStat(Base):
+    __tablename__ = "channel_stat"
+    __table_args__ = (
+        UniqueConstraint("context_key", "channel", name="uq_channel_stat_context_channel"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    context_key: Mapped[str] = mapped_column(Text, nullable=False)
+    channel: Mapped[str] = mapped_column(Text, nullable=False)
+    successes: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    failures: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class ChannelHealth(Base):
+    __tablename__ = "channel_health"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    channel: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    consecutive_failures: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    last_checked_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class PreferenceComparison(Base):
+    __tablename__ = "preference_comparison"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    event_key: Mapped[str | None] = mapped_column(CHAR(5), nullable=True)
+    winner: Mapped[str] = mapped_column(Text, nullable=False)
+    loser: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class FunctionPattern(Base):
+    __tablename__ = "function_pattern"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    traditions: Mapped[str] = mapped_column(Text, nullable=False)
+    region: Mapped[str] = mapped_column(Text, nullable=False)
+    structure: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    accepted_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class EventRule(Base):
+    __tablename__ = "event_rule"
+    __table_args__ = (Index("event_rule_event_fn_idx", "event_key", "function_id"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    event_key: Mapped[str] = mapped_column(
+        CHAR(5), ForeignKey("event.event_key", ondelete="CASCADE"), nullable=False
+    )
+    function_id: Mapped[str] = mapped_column(Text, nullable=False)
+    rule_id: Mapped[str] = mapped_column(Text, nullable=False)
+    forbid: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False)
+    confirm: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'")
+    )
+    origin: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class UiTranslation(Base):
+    __tablename__ = "ui_translation"
+    __table_args__ = (UniqueConstraint("lang", "key", name="uq_ui_translation_lang_key"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    lang: Mapped[str] = mapped_column(Text, nullable=False)
+    key: Mapped[str] = mapped_column(Text, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    agreement: Mapped[float] = mapped_column(Double, nullable=False, server_default=sa.text("1.0"))
+    reviewed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("false"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class TuningValue(Base):
+    __tablename__ = "tuning_value"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    name: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    value: Mapped[float] = mapped_column(Double, nullable=False)
+    n: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
+class OsmCache(Base):
+    __tablename__ = "osm_cache"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    cache_key: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    query: Mapped[str] = mapped_column(Text, nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

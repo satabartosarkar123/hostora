@@ -34,3 +34,10 @@ policy:
   verifier_samples: 3        # independent verifier answers per item (agreement score)
   min_agreement: 0.67        # replaced by the calibrated value (hostora calibrate)
   alpha: 0.01                # target: at most 1% unsafe auto-approvals, with a conformal bound
+
+osm:
+  taginfo_url: "https://taginfo.openstreetmap.org/api/4/tag/stats"
+  overpass_url: "https://overpass-api.de/api/interpreter"
+  user_agent: "Hostora/1.0 (contact: info@hostora.internal; non-commercial venue planning)"
+  cache_days: 7
+  attribution: "© OpenStreetMap contributors"

@@ -7,12 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from hostora.config import Settings
 from hostora.db.session import get_session
 from hostora.security.tokens import verify_cron_signature
+from hostora.services.learning import run_nightly_learning
 from hostora.services.retention import run_cleanup_job, run_retention_job, run_warm_job
 from hostora.web.deps import get_settings_dep
 
 router = APIRouter(tags=["internal"])
 
-CronJob = Literal["retention", "cleanup", "warm"]
+CronJob = Literal["retention", "cleanup", "warm", "learn"]
 
 
 @router.post("/internal/cron/{job}")
@@ -35,6 +36,8 @@ async def internal_cron_job(
         counts = await run_retention_job(session, now=now_dt)
     elif job == "cleanup":
         counts = await run_cleanup_job(session, now=now_dt)
+    elif job == "learn":
+        counts = await run_nightly_learning(session)
     else:
         counts = await run_warm_job(session)
 

@@ -43,12 +43,24 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="event-tradition">Tradition Template (names functions only)</label>
-        <select id="event-tradition" name="tradition" class="form-control">
-          {% for tid, tinfo in traditions.items() %}
-          <option value="{{ tid }}">{{ tinfo.label }}</option>
-          {% endfor %}
-        </select>
+        <label class="form-label" for="event-tradition">Tradition / Culture (AI proposes functions with citations)</label>
+        <input
+          id="event-tradition"
+          name="tradition"
+          list="tradition-options"
+          class="form-control"
+          placeholder="e.g. Interfaith, Bengali Hindu, Muslim, Punjabi..."
+          value="Interfaith"
+        >
+        <datalist id="tradition-options">
+          <option value="Interfaith">
+          <option value="Bengali Hindu">
+          <option value="North Indian Hindu">
+          <option value="Muslim">
+          <option value="Christian">
+          <option value="Sikh">
+          <option value="Casual Dinner">
+        </datalist>
       </div>
     </div>
 

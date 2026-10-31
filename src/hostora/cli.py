@@ -449,5 +449,87 @@ def doctor(
         raise typer.Exit(code=1)
 
 
+@app.command("learn")
+def learn_cmd() -> None:
+    """Run nightly learning job idempotently (turnout, portions, elasticity, channel stats)."""
+    import asyncio
+
+    from hostora.config import get_settings
+    from hostora.db.session import make_engine, make_sessionmaker
+    from hostora.services.learning import run_nightly_learning
+
+    async def _run() -> dict[str, Any]:
+        settings = get_settings()
+        engine = make_engine(settings)
+        maker = make_sessionmaker(engine)
+        try:
+            async with maker() as session:
+                return await run_nightly_learning(session)
+        finally:
+            await engine.dispose()
+
+    result = asyncio.run(_run())
+    typer.echo(f"Nightly learning complete: {result}")
+
+
+@app.command("backtest")
+def backtest_cmd(
+    min_events: Annotated[int | None, typer.Option(help="Minimum events for backtest")] = None,
+) -> None:
+    """Run rolling-origin evaluation comparing Phase-1 rules with Bayesian model."""
+    import asyncio
+
+    from hostora.config import get_settings
+    from hostora.db.session import make_engine, make_sessionmaker
+    from hostora.services.learning import run_backtest
+
+    async def _run() -> dict[str, Any]:
+        settings = get_settings()
+        engine = make_engine(settings)
+        maker = make_sessionmaker(engine)
+        try:
+            async with maker() as session:
+                return await run_backtest(session, min_events=min_events)
+        finally:
+            await engine.dispose()
+
+    res = asyncio.run(_run())
+    typer.echo(
+        f"Backtest result:\n"
+        f"  Active model: {res.get('active_model')}\n"
+        f"  Events evaluated: {res.get('n_events')}\n"
+        f"  Bayesian pinball loss: {res.get('bayesian_loss')}\n"
+        f"  Rules pinball loss: {res.get('rules_loss')}\n"
+        f"  80% interval coverage: {res.get('coverage_80')}"
+    )
+
+
+@app.command("insights")
+def insights_cmd() -> None:
+    """Print the status of every learned quantity: value, n, last update, and basis."""
+    import asyncio
+
+    from hostora.config import get_settings
+    from hostora.db.session import make_engine, make_sessionmaker
+    from hostora.services.learning import get_insights_data
+
+    async def _run() -> dict[str, Any]:
+        settings = get_settings()
+        engine = make_engine(settings)
+        maker = make_sessionmaker(engine)
+        try:
+            async with maker() as session:
+                return await get_insights_data(session)
+        finally:
+            await engine.dispose()
+
+    data = asyncio.run(_run())
+    items = data.get("items", [])
+    typer.echo(f"{'Quantity Name':<35} {'Value':<30} {'n':<6} {'Basis'}")
+    typer.echo("-" * 100)
+    for it in items:
+        typer.echo(f"{it['name']:<35} {str(it['value'])[:28]:<30} {it['n']:<6} {it['basis']}")
+
+
 if __name__ == "__main__":
     app()

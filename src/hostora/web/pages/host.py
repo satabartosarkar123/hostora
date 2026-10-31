@@ -8,10 +8,12 @@ import segno
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import ValidationError
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from hostora.config import Settings
 from hostora.data.loader import get_data
+from hostora.db.models import Event
 from hostora.db.session import get_session
 from hostora.errors import ProblemError
 from hostora.schemas.common import EventType, GateMode, Language, Meal, RuleId
@@ -32,6 +34,11 @@ from hostora.services.events import (
 )
 from hostora.services.households import add_households_batch, list_households
 from hostora.services.invites import mark_invite_sent, prepare_invites
+from hostora.services.learning import (
+    get_insights_data,
+    record_preference_comparison,
+    save_event_rule,
+)
 from hostora.web.deps import get_settings_dep
 from hostora.web.i18n import resolve_language
 from hostora.web.templating import template_context
@@ -638,3 +645,104 @@ async def host_delete_account_page(
     await delete_account(session, host)
     request.session.clear()
     return RedirectResponse(url="/", status_code=303)
+
+
+@router.post("/app/e/{event_key}/slider")
+async def host_update_slider(
+    event_key: str,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    host = await _require_page_host(request)
+    if host is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    form = await request.form()
+    raw_val = str(form.get("slider") or form.get("short_waste_slider") or "5")
+    val = max(1, min(10, int(raw_val)))
+
+    stmt = sa_update(Event).where(Event.event_key == event_key).values(short_waste_slider=val)
+    await session.execute(stmt)
+    await session.commit()
+
+    if request.headers.get("hx-request") == "true":
+        return Response(
+            f'<span class="badge badge--success" id="slider-status">Saved (ratio: {val}/10)</span>',
+            media_type="text/html",
+        )
+    return RedirectResponse(url=f"/app/e/{event_key}", status_code=303)
+
+
+@router.get("/app/insights")
+async def app_insights_page(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    host = await _require_page_host(request)
+    if host is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    lang = resolve_language(request)
+    insights = await get_insights_data(session)
+    templates = request.app.state.templates
+    resp: Response = templates.TemplateResponse(
+        request,
+        "host/insights.html",
+        template_context(
+            request,
+            lang=lang,
+            include_csrf=True,
+            include_manifest=True,
+            host=host,
+            insights=insights,
+        ),
+    )
+    return _apply_lang_cookie(request, resp, lang)
+
+
+@router.post("/app/e/{event_key}/rules/custom")
+async def host_add_custom_rule(
+    event_key: str,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    host = await _require_page_host(request)
+    if host is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    form = await request.form()
+    function_id = str(form.get("function_id") or "")
+    rule_name = str(form.get("rule_name") or "custom_rule").strip()
+    forbid_tag = str(form.get("forbid_tag") or "").strip().lower()
+    if function_id and forbid_tag:
+        await save_event_rule(
+            session,
+            event_key=event_key,
+            function_id=function_id,
+            rule_id=f"custom_{rule_name}",
+            forbid=[forbid_tag],
+            origin="host_edit",
+        )
+        await session.commit()
+    return RedirectResponse(url=f"/app/e/{event_key}", status_code=303)
+
+
+@router.post("/app/e/{event_key}/budget/preference")
+async def host_record_budget_preference(
+    event_key: str,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    host = await _require_page_host(request)
+    if host is None:
+        return Response("Unauthorized", status_code=401)
+    data = await request.json()
+    winner = str(data.get("winner") or "").strip()
+    loser = str(data.get("loser") or "").strip()
+    if winner and loser:
+        await record_preference_comparison(
+            session,
+            event_key=event_key,
+            winner=winner,
+            loser=loser,
+            source="drag_rank",
+        )
+        await session.commit()
+    return Response(json.dumps({"ok": True}), media_type="application/json")

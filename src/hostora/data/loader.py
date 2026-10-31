@@ -30,10 +30,11 @@ class DataBundle:
     rules: dict[str, RuleSet]
     confirm: dict[str, dict[str, str]]
     semantics: Semantics
-    traditions: dict[str, Any]  # Any: free-form YAML shown in the wizard
+    traditions: dict[str, Any]  # Fallback patterns for compatibility; functions are learned
     channels: dict[str, Channel]
     concept_map: dict[str, Any]
     sources: dict[str, Any]
+    tuning: dict[str, Any]
 
 
 class DataError(ValueError):
@@ -47,14 +48,25 @@ def _compute_version(files: list[Path]) -> str:
     return h.hexdigest()
 
 
+DEFAULT_TRADITIONS: dict[str, Any] = {
+    "traditions": {
+        "interfaith": {"label": "Interfaith", "functions": ["Ceremony", "Reception"]},
+    },
+    "invite_text": {
+        "en": "{host} invites you to {event}. Please reply here: {link} (code {code})",
+        "hi": "{host} आपको {event} में आमंत्रित करते हैं। कृपया यहाँ जवाब दें: {link} (कोड {code})",
+    },
+}
+
+
 def load_data(data_dir: Path) -> DataBundle:
     rules_path = data_dir / "rules" / "rules.yaml"
-    traditions_path = data_dir / "templates" / "traditions.yaml"
     channels_path = data_dir / "commerce" / "channels.yaml"
     concept_map_path = data_dir / "knowledge" / "concept_map.yaml"
     sources_path = data_dir / "knowledge" / "sources.yaml"
+    tuning_path = data_dir / "tuning.yaml"
 
-    all_paths = [rules_path, traditions_path, channels_path, concept_map_path, sources_path]
+    all_paths = [rules_path, channels_path, concept_map_path, sources_path, tuning_path]
     for p in all_paths:
         if not p.exists():
             raise DataError(f"Missing data file: {p}")
@@ -92,10 +104,7 @@ def load_data(data_dir: Path) -> DataBundle:
     except ValueError as e:
         raise DataError(f"{rules_path.name}: {e}") from e
 
-    # 2. Traditions
-    traditions_raw = yaml.safe_load(traditions_path.read_text(encoding="utf-8")) or {}
-
-    # 3. Commerce channels
+    # 2. Commerce channels
     channels_raw = yaml.safe_load(channels_path.read_text(encoding="utf-8")) or {}
     channels_dict = channels_raw.get("channels") or {}
     channels: dict[str, Channel] = {}
@@ -135,15 +144,21 @@ def load_data(data_dir: Path) -> DataBundle:
     if "policy" not in sources_raw:
         raise DataError(f"{sources_path.name}: missing policy config")
 
+    # 6. Tuning
+    tuning_raw = yaml.safe_load(tuning_path.read_text(encoding="utf-8")) or {}
+    if "tuning" not in tuning_raw or not isinstance(tuning_raw["tuning"], dict):
+        raise DataError(f"{tuning_path.name}: missing tuning section")
+
     return DataBundle(
         version=version,
         rules=rules,
         confirm=confirm,
         semantics=semantics,
-        traditions=traditions_raw,
+        traditions=DEFAULT_TRADITIONS,
         channels=channels,
         concept_map=concept_map_raw,
         sources=sources_raw,
+        tuning=tuning_raw["tuning"],
     )
 
 
@@ -155,3 +170,15 @@ def get_data(data_dir: Path | None = None) -> DataBundle:
         return load_data(get_settings().data_dir)
     except Exception:
         return load_data(Path("data"))
+
+
+def get_tuning_value(name: str, fallback: float = 0.0) -> float:
+    """Retrieve a parameter from data/tuning.yaml."""
+    try:
+        data = get_data()
+        val = data.tuning.get(name, {}).get("value")
+        if val is not None:
+            return float(val)
+    except (DataError, KeyError, ValueError, TypeError):
+        return fallback
+    return fallback

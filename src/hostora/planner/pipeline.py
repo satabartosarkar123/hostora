@@ -16,7 +16,7 @@ from hostora.adapters.commerce import (
 )
 from hostora.adapters.knowledge.verifier import verify_dish_composition
 from hostora.adapters.knowledge.web import fetch_web_evidence
-from hostora.data.loader import DataBundle, get_data
+from hostora.data.loader import DataBundle, get_data, get_tuning_value
 from hostora.db.models import Event, EventLog, Fn, Household, PlanModel
 from hostora.engine.grounding import (
     Evidence,
@@ -25,6 +25,7 @@ from hostora.engine.grounding import (
     ProposedItem,
     ground,
 )
+from hostora.engine.newsvendor import critical_ratio, order_quantity
 from hostora.engine.portions import (
     ServingKind,
     consumption_row,
@@ -32,10 +33,7 @@ from hostora.engine.portions import (
 )
 from hostora.engine.pricing import PriceQuote, choose_price
 from hostora.engine.quantity import (
-    DEFAULT_ALPHA,
-    Headcount,
     Meal,
-    raw_quantity,
     round_to_packs,
 )
 from hostora.planner.prompts import (
@@ -58,6 +56,7 @@ from hostora.schemas.plan import (
     RemovedItem,
 )
 from hostora.services.knowledge import get_default_vocabulary
+from hostora.services.learning import slider_to_cost_ratio
 from hostora.services.summary import get_event_summary
 
 if TYPE_CHECKING:
@@ -137,6 +136,8 @@ async def execute_planner_steps(
     data: DataBundle | None = None,
     now: datetime | None = None,
     region: str = "India",
+    short_waste_slider: int = 5,
+    arrival_samples: list[int] | None = None,
 ) -> AsyncIterator[tuple[str, Any]]:
     """Execute open-world grounded planner steps and stream progress tuples (evt_name, payload)."""
     now = now or datetime.now(UTC)
@@ -280,16 +281,14 @@ async def execute_planner_steps(
             per_head_str = f"1 unit per {sk.per_guests} guests"
         else:
             c_row = consumption_row(sk, p.name, meal)
-            needed = raw_quantity(
-                Headcount(adults=headcount.adults, children=headcount.children),
-                c_row,
-                dishes_in_course=1,
-                alpha=DEFAULT_ALPHA,
-                buffer=0.05,
-            )
-            per_head_str = (
-                f"Sized for {headcount.adults} adults ({c_row.per_adult:.0f} {sk.unit}), {sk.basis}"
-            )
+            cost_short, cost_waste = slider_to_cost_ratio(short_waste_slider)
+            cr = critical_ratio(cost_short, cost_waste)
+            alpha_val = float(get_tuning_value("elasticity_prior_mean", 0.65))
+            tot_guests = max(1, headcount.adults + headcount.children)
+            samples = arrival_samples or [tot_guests] * 50
+            demand_samples = [float(arr) * c_row.per_adult * (1.0**-alpha_val) for arr in samples]
+            needed = order_quantity(demand_samples, cost_short, cost_waste)
+            per_head_str = f"Sized via Newsvendor (ratio {cr:.2f}) from arrivals, {sk.basis}"
 
         pack_plan = round_to_packs(needed, sk.pack_sizes)
         packs_out = [PackOut(size=ps, count=cnt) for ps, cnt in pack_plan.packs]
@@ -455,6 +454,7 @@ async def run_planner_stream(
         or "",
         router=router,
         region=region,
+        short_waste_slider=event.short_waste_slider,
     ):
         if evt_name == "done" and isinstance(payload, Plan):
             final_plan = payload

@@ -153,6 +153,7 @@ async def get_event_detail(
                 "pincode": event.pincode,
             },
             "budgetInr": event.budget_inr,
+            "shortWasteSlider": event.short_waste_slider,
             "isDemo": event.is_demo,
             "functions": [
                 {

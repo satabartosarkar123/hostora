@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Model Insights · Hostora{% endblock %}
+
+{% block container_class %}container--wide{% endblock %}
+
+{% block nav %}
+<a class="btn btn--secondary" href="/app">Events</a>
+<a class="btn btn--secondary" href="/app/settings">Settings</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div>
+    <h1 style="margin:0;">Learned System Insights</h1>
+    <p class="muted" style="margin:0.25rem 0 0 0;">
+      Transparency dashboard for all learned priors, Bayesian models, and active safety bounds.
+    </p>
+  </div>
+</div>
+
+<div class="grid-3" style="margin-bottom:1.5rem;">
+  <div class="card" style="margin:0;">
+    <span class="muted">Grounding Quorum</span>
+    <p class="stat-value">{{ insights.policy.quorum }} sources</p>
+    <p class="muted" style="margin:0;">At least 1 non-model source required</p>
+  </div>
+  <div class="card" style="margin:0;">
+    <span class="muted">Min Agreement Threshold</span>
+    <p class="stat-value">{{ "%.2f"|format(insights.policy.min_agreement) }}</p>
+    <p class="muted" style="margin:0;">Calibrated conformal threshold</p>
+  </div>
+  <div class="card" style="margin:0;">
+    <span class="muted">Conformal Risk Bound (α)</span>
+    <p class="stat-value">{{ "%.3f"|format(insights.policy.alpha) }}</p>
+    <p class="muted" style="margin:0;">Target maximum unsafe auto-approvals</p>
+  </div>
+</div>
+
+<section class="card">
+  <h2>Learned Quantities &amp; Model Registry</h2>
+  <div style="overflow-x:auto;">
+    <table class="table" style="width:100%; text-align:left; border-collapse:collapse;">
+      <thead>
+        <tr style="border-bottom:2px solid var(--border);">
+          <th style="padding:0.6rem;">Parameter / Model</th>
+          <th style="padding:0.6rem;">Current Value</th>
+          <th style="padding:0.6rem;">Observations (n)</th>
+          <th style="padding:0.6rem;">Basis / Citation</th>
+          <th style="padding:0.6rem;">Updated By</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in insights.items %}
+        <tr style="border-bottom:1px solid var(--border);">
+          <td style="padding:0.6rem; font-family:monospace; font-size:0.9rem;"><strong>{{ item.name }}</strong></td>
+          <td style="padding:0.6rem;">{{ item.value }}</td>
+          <td style="padding:0.6rem;">{{ item.n }}</td>
+          <td style="padding:0.6rem;" class="muted">{{ item.basis }}</td>
+          <td style="padding:0.6rem;"><span class="badge">{{ item.updated_by }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

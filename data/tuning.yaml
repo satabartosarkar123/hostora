@@ -1,0 +1,126 @@
+# Tuning registry for Hostora learning loops and engine parameters.
+# Every number has a recorded basis: prior with citation, learned, calibrated, hard_bound, or host_default.
+# Learned and calibrated values are updated by nightly jobs in the tuning_value table.
+
+version: 1
+
+tuning:
+  min_backtest_events:
+    value: 10
+    kind: hard_bound
+    basis: "Minimum number of finished events required before rolling-origin model selection activates"
+    updated_by: null
+
+  osm_min_tag_count:
+    value: 50
+    kind: hard_bound
+    basis: "Minimum global tag usage count in taginfo to accept an AI-proposed OpenStreetMap tag"
+    updated_by: null
+
+  local_radius_m:
+    value: 5000
+    kind: hard_bound
+    basis: "Search radius in meters around event venue for nearby vendors in Overpass API"
+    updated_by: null
+
+  translation_min_agreement:
+    value: 0.70
+    kind: calibrated
+    basis: "Minimum back-translation agreement score required to auto-accept AI-drafted invitations"
+    updated_by: "calibrate"
+
+  max_flag_rate:
+    value: 0.05
+    kind: hard_bound
+    basis: "Maximum allowable fraction of items flagged by hosts as wrong before triggering drift response"
+    updated_by: null
+
+  turnout_global_prior_strength:
+    value: 5.0
+    kind: prior
+    basis: "Gelman et al., Bayesian Data Analysis (3rd ed.) weak informative prior sample size"
+    updated_by: null
+
+  turnout_prior_yes_mean:
+    value: 0.85
+    kind: prior
+    basis: "Hostora BRD survey of Indian wedding and party RSVP attendance"
+    updated_by: null
+
+  turnout_prior_maybe_mean:
+    value: 0.50
+    kind: prior
+    basis: "Hostora BRD survey of Indian wedding and party RSVP attendance"
+    updated_by: null
+
+  turnout_prior_no_reply_mean:
+    value: 0.20
+    kind: prior
+    basis: "Hostora BRD survey of Indian wedding and party RSVP attendance"
+    updated_by: null
+
+  elasticity_prior_mean:
+    value: 0.65
+    kind: prior
+    basis: "Heuristic dish-count elasticity alpha (quantity scales as K^-alpha)"
+    updated_by: null
+
+  elasticity_prior_sd:
+    value: 0.15
+    kind: prior
+    basis: "Heuristic dish-count elasticity prior uncertainty"
+    updated_by: null
+
+  portion_outcome_tolerance:
+    value: 0.15
+    kind: prior
+    basis: "Outcome about-right tolerance range around planned per-head amount"
+    updated_by: null
+
+  short_waste_default_slider:
+    value: 5
+    kind: host_default
+    basis: "Balanced 1:1 running out vs leftovers default slider position"
+    updated_by: null
+
+  decor_cost_ratio:
+    value: 1.0
+    kind: prior
+    basis: "Default cost_short : cost_waste ratio for non-food items"
+    updated_by: null
+
+  grounding_min_quorum:
+    value: 2
+    kind: hard_bound
+    basis: "Minimum independent source families required to approve an item"
+    updated_by: null
+
+  grounding_alpha:
+    value: 0.01
+    kind: calibrated
+    basis: "Conformal risk control target error rate"
+    updated_by: "calibrate"
+
+  bandit_top_k:
+    value: 2
+    kind: hard_bound
+    basis: "Number of top shop arms logged as exposure on display"
+    updated_by: null
+
+  channel_health_fail_threshold:
+    value: 2
+    kind: hard_bound
+    basis: "Consecutive health-check failures before marking a commerce channel inactive"
+    updated_by: "health_check"
+
+  drift_coverage_low:
+    value: 0.70
+    kind: hard_bound
+    basis: "Lower bound of acceptable 80% coverage before declaring model drift"
+    updated_by: null
+
+  drift_coverage_high:
+    value: 0.90
+    kind: hard_bound
+    basis: "Upper bound of acceptable 80% coverage before declaring model drift"
+    updated_by: null

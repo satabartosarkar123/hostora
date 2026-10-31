@@ -24,6 +24,61 @@
   <a class="btn btn--secondary" href="/app/e/{{ event_key }}">Back to Dashboard</a>
 </div>
 
+<section class="card" style="margin-bottom:1.5rem;">
+  <h2 style="margin-top:0;">Category Priorities (Learned Preferences)</h2>
+  <p class="muted">
+    Rank your categories by priority. When your budget is constrained, the knapsack optimizer uses these Bradley-Terry preference scores to decide which items to protect and which to swap or drop.
+  </p>
+  <div id="priority-ranking-list" style="display:flex; flex-direction:column; gap:0.5rem; max-width:480px;">
+    {% set cat_list = by_category.keys() | list if by_category else ["food", "beverage", "tableware", "decor"] %}
+    {% for cat in cat_list %}
+    <div class="card category-rank-item" draggable="true" data-cat="{{ cat }}" style="display:flex; justify-content:space-between; align-items:center; padding:0.6rem 1rem; margin:0; cursor:grab; background:var(--surface-alt);">
+      <span style="font-weight:700; text-transform:capitalize;">{{ loop.index }}. {{ cat }}</span>
+      <div style="display:flex; gap:0.25rem;">
+        <button type="button" class="btn btn--secondary btn--sm btn-rank-up" onclick="moveCategory('{{ cat }}', -1)" aria-label="Move {{ cat }} up">▲</button>
+        <button type="button" class="btn btn--secondary btn--sm btn-rank-down" onclick="moveCategory('{{ cat }}', 1)" aria-label="Move {{ cat }} down">▼</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <p id="rank-status" class="muted" style="margin-top:0.75rem; font-size:0.9rem;">Rank order saved automatically.</p>
+</section>
+
+<script>
+function moveCategory(cat, delta) {
+  const container = document.getElementById("priority-ranking-list");
+  const items = Array.from(container.children);
+  const idx = items.findIndex(el => el.getAttribute("data-cat") === cat);
+  if (idx < 0) return;
+  const newIdx = idx + delta;
+  if (newIdx < 0 || newIdx >= items.length) return;
+  
+  const winner = delta < 0 ? cat : items[newIdx].getAttribute("data-cat");
+  const loser = delta < 0 ? items[newIdx].getAttribute("data-cat") : cat;
+  
+  if (delta < 0) {
+    container.insertBefore(items[idx], items[newIdx]);
+  } else {
+    container.insertBefore(items[newIdx], items[idx]);
+  }
+  
+  // Re-number
+  Array.from(container.children).forEach((el, i) => {
+    const nameSpan = el.querySelector("span");
+    const cName = el.getAttribute("data-cat");
+    nameSpan.textContent = (i + 1) + ". " + cName;
+  });
+  
+  fetch('/app/e/{{ event_key }}/budget/preference', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({winner: winner, loser: loser})
+  }).then(r => {
+    document.getElementById("rank-status").textContent = "Updated preference: " + winner + " prioritized over " + loser + ".";
+  });
+}
+</script>
+
 <section class="card">
   <h2 style="margin-top:0;">By Category</h2>
   {% if by_category %}
