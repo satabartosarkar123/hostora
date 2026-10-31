@@ -1618,6 +1618,8 @@ Verify the Blueprint keys against Render's Blueprint specification at build time
 
 ## 17. Milestones and acceptance checks
 
+> After M5-G, build **M5-L** (section 24) before M6.
+
 **Hackathon cut = M0 → M6, plus Hindi strings, the demo seed and the waste simulator from M8.** One strong developer with an agent: about 4–6 focused days.
 
 ### M0 — Bootstrap
@@ -2052,3 +2054,155 @@ Accept:
 - evals show 0 unsafe auto-approvals;
 - `hostora explain "galouti kebab" --rules pure_veg` shows removal with a Wikidata or web citation;
 - a plan for an event in Kolkata and one in Chennai contain different, regionally appropriate dishes, none of which appear anywhere in the repository.
+
+
+## 24. Everything learned: no remaining hand-set decisions
+
+Section 23 removed fixed item lists. This section removes the remaining hand-set decisions. Every number or choice the app shows is now one of three things:
+- **learned** from real events, with a weak, cited prior for the cold start;
+- **calibrated** from labelled data with a stated error bound;
+- **chosen by the host.**
+
+What stays fixed is listed in 24.9 and is limited to definitions the host controls and hard physical or safety bounds.
+
+### 24.1 Engine modules (done, tested in `tests/engine/test_learning.py`)
+
+| Module | Method | Replaces |
+| --- | --- | --- |
+| `engine/turnout.py` | Hierarchical Beta-Binomial per reply status and segment; pooling strength by method of moments; Monte Carlo predictive distribution (households arrive as units, rate uncertainty included); `pinball_loss` for backtests | fixed 96% / 70% / 30% rates and the p80 rule |
+| `engine/newsvendor.py` | Order the critical-ratio quantile `cost_short / (cost_short + cost_waste)` of predicted demand | fixed "p80 plates" and the fixed 10% buffer |
+| `engine/bayes.py` | Grid posterior for a log-normal quantity from exact, at-least (ran out), at-most and between (about right) observations; normal-normal learning of the dish-count elasticity α, limited to the physical range [0, 1] | the "ran short = +15%" factor and the fixed α = 0.65 |
+| `engine/bandit.py` | Thompson sampling with context posteriors shrunk to each shop's global rate | the fixed days-left → shop table |
+| `engine/preferences.py` | Bradley–Terry preference scores (MM algorithm); exact multiple-choice knapsack for budget fitting | the fixed "drop decor first" order |
+| `engine/grounding.py` (updated) | `Semantics` loaded from `rules.yaml`; `Evidence.absent` with an absence quorum | diet constants in code; the negation word list |
+
+### 24.2 Turnout
+
+- **Observations:** after a function ends, gate scans give arrived households per reply status. A host-entered total only, with no gate, is split across statuses in proportion to current expected arrivals and counted at half weight.
+  - Table: `turnout_observation(function_id, state, event_type, function_kind, reply_bucket, status, invited_households, arrived_households, source, weight, recorded_at)`.
+- **Segments:** state × event type × function kind (ceremony / reception / meal) × reply-timing bucket. The bucket edges are the 25th, 50th and 75th percentiles of observed reply lead times, recomputed nightly.
+- **Learning (nightly):**
+  1. Global prior per status from the cited BRD estimates, strength 5.
+  2. Global posterior from all observations.
+  3. `pooling_strength` per status across segments.
+  4. `segment_rate` per segment.
+
+  Results are stored in `turnout_model(segment_key, status, a, b, strength, n, updated_at)`.
+- **Prediction:** `simulate_arrivals` (4,000 draws, seeded by the function id) feeds p10, p50 and p90 on the dashboard.
+- **Model selection:** `hostora backtest` runs a rolling-origin evaluation over finished events, comparing the phase-1 rules (`prediction.py`) with the Bayesian model by pinball loss at 0.1 / 0.5 / 0.9 and by 80%-interval coverage. The app uses the Bayesian model once it beats the rules on at least `tuning.min_backtest_events` events, and the dashboard says which model is active.
+
+### 24.3 Plates and quantities
+
+- **The host states one preference once** per event (changeable): "How bad is running out compared with leftovers?" on a 1–10 slider, giving `cost_short : cost_waste`. Food items use it directly; decor and supplies use the category ratio learned from host edits (default 1:1, a prior).
+- **Plates:** `order_quantity(arrival_samples, cost_short, cost_waste)`.
+- **Item quantity:** draw arrivals × per-head portion for each sample. The portion comes from the `lognormal_posterior` of its serving kind and region, approximated as log-normal with σ = (ln p90 − ln p10) / 2.563. Then take `order_quantity` on those quantity samples, then `round_to_packs`.
+- **Portions:** each outcome report is converted with `outcome_to_obs` (the about-right tolerance is a `tuning` prior). The posterior is stored in `portion_model(serving_kind, region, median, p10, p90, n, updated_at)`.
+- **Dish-count elasticity:** per course, from course-level outcome ratios with `learn_elasticity` (prior 0.65 ± 0.15, cited as a heuristic). Stored in `elasticity_model(course, mean, sd, n)`. `raw_quantity` receives the learned α.
+
+### 24.4 Where to buy
+
+- **Exposure and reward logging:** when buy options are shown, the top 2 count as exposures; "Mark bought" with a shop counts as a success. Data goes to `channel_stat(context_key, channel, successes, failures)`, aggregated nightly. The context is state × item kind × days band. Band edges are the quartiles of days-left at purchase, recomputed nightly.
+- **Ranking:** `rank_arms` with a per-request seed, so each request explores, plus `rank_options` for priced live SKUs.
+- **Channel health:** a weekly job opens each `channels.yaml` pattern with a sample query and disables channels that fail twice in a row (`channel_health` table). Nothing is deleted from config automatically.
+- **Local vendors (free, dynamic):**
+  1. The proposer suggests OpenStreetMap tags for each item kind (for example `shop=confectionery`, `craft=caterer`).
+  2. Each tag is validated live against the taginfo API: it must exist with a usage count above `tuning.osm_min_tag_count`.
+  3. The Overpass API is queried around the venue (`tuning.local_radius_m`) and cached for 7 days.
+  4. Results are shown as "Nearby · <name> · 1.2 km (© OpenStreetMap contributors)" and learned as the `local` arm.
+
+  Verify the Overpass and taginfo endpoints and usage policies at build time and put them in `sources.yaml`.
+
+### 24.5 Budget
+
+- **Preferences:** the budget page lets the host drag to rank categories, which becomes pairwise comparisons. Implicit comparisons are recorded when the host removes X while keeping Y in the same plan (Y beats X).
+  - Global Bradley–Terry scores across hosts form the prior, entered as virtual comparisons.
+  - The host's own comparisons personalise them.
+  - Storage: `preference_comparison(event_key, winner, loser, source, created_at)`, with no personal data.
+- **Optimisation:** each plan line offers variants (premium, standard, cheaper grounded alternative, and drop when the line is optional), with utility = preference score × the variant's quality factor (from the proposal, with grounded prices). `optimize_budget` picks the exact best combination. The old `fit_budget` stays only for comparison tests.
+
+### 24.6 Functions, invitations and languages
+
+- **No `traditions.yaml`. Functions:** the AI proposes the functions for this specific event (names, local names, timing relative to the main day, meal, typical guest share, why), grounded by web retrieval with `quote_supported` citations where available.
+  - The host edits them.
+  - Accepted structures are stored anonymously (`function_pattern(traditions, region, structure jsonb, accepted_count)`) and the most similar accepted ones are retrieved as examples for the next proposal.
+  - Without a model, the host enters functions manually.
+- **Invite text:** drafted by the AI in each household's language (any Indian language). Every draft goes through:
+  - validation: `{link}` and `{code}` exactly once each, within the length limit;
+  - a back-translation check by the verifier: agreement below `tuning.translation_min_agreement` is flagged;
+  - host approval.
+- **UI languages:** English and Hindi are maintained. Other languages are machine-translated packs cached in `ui_translation(lang, key, text, agreement, reviewed)`. Packs below the agreement threshold show a "help improve this translation" notice.
+
+### 24.7 Rules (host-controlled, never loosened by AI)
+
+- `semantics` in `rules.yaml` drives `ground` (via `semantics_from_data`).
+- **Per-event rule editing:** `event_rule(event_key, function_id, rule_id, forbid text[], confirm jsonb, origin)`. Hosts can add or remove tags of a preset for their family, or create a custom rule from any vocabulary concept ("no mushrooms").
+- **AI suggestions** may only make rules stricter, must cite a source, and need host acceptance.
+- **Absence claims:** verifier and web extraction return `absent` tags (stated absences such as "eggless" or "बिना प्याज"). There is no negation word list.
+
+### 24.8 Tuning registry, monitoring and drift
+
+- **`data/tuning.yaml`:** every remaining constant, each with `value`, `kind` (`prior` | `learned` | `calibrated` | `hard_bound` | `host_default`), `basis` (citation or method) and `updated_by` (job name). Learned and calibrated values are overwritten nightly in `tuning_value(name, value, n, updated_at)`. Run a numeric-literal sweep over `services/`, `planner/` and `web/` and move every non-trivial literal here.
+- **Nightly `learn` job** (signed cron + `uv run hostora learn`), idempotent:
+  1. turnout;
+  2. portions;
+  3. elasticity;
+  4. channel stats and band edges;
+  5. reply buckets;
+  6. preference priors;
+  7. grounding recalibration (`calibrate`);
+  8. monitoring.
+- **Monitoring:**
+  - 80%-interval coverage of arrivals (target 0.7–0.9);
+  - pinball loss trend;
+  - share of grounded items hosts flag as wrong;
+  - auto-approval and confirmation rates;
+  - channel regret proxy.
+- **Drift response:** if coverage leaves its band or flags rise above `tuning.max_flag_rate`, the job tightens grounding (quorum + 1, alpha halved), recalibrates and logs `model_change` to `event_log`.
+- **Owner-only page** `/app/insights` shows the status of every learned quantity: value, n, last update, basis.
+
+### 24.9 What remains fixed, by design
+
+- Rule definitions and semantics in `rules.yaml`: host-controlled definitions, editable per event.
+- `concept_map.yaml`: the bridge from broad ontology concepts to rule tags.
+- **Hard bounds:**
+  - posterior grid width (±4 prior SDs);
+  - α in [0, 1];
+  - learned portions limited to the grid;
+  - the grounding quorum is never below 2, including a non-AI source;
+  - the newsvendor cost ratio must be positive.
+- Shop URL patterns in `channels.yaml` (where to buy, health-checked).
+- Cold-start priors, each with a citation, and visibly replaced as data arrives.
+
+### 24.10 Validation (simulation-based)
+
+`tests/simulation/test_learning_loops.py` generates at least 200 synthetic events from known true parameters (segment turnout rates different from the published priors, a true portion, a true α, true shop success rates, a true preference order). It runs the nightly `learn` and asserts:
+- turnout means within 0.03 of the truth in large segments;
+- 80% intervals cover 70–90% of held-out events;
+- the portion median within 10% of the truth;
+- α within 0.05;
+- Thompson cumulative regret in the second half below the first half;
+- Bradley–Terry recovers the true order with Kendall τ ≥ 0.8;
+- the Bayesian model beats the phase-1 rules in pinball loss.
+
+Everything is seeded and deterministic. The numbers go to `docs/metrics.md`, labelled "synthetic validation".
+
+### 24.11 Milestone M5-L (after M5-G)
+
+Tasks: 24.2–24.10, migration `0003_learning`, schema and UI changes, the CLI commands `learn`, `backtest` and `insights`, tests.
+
+Accept:
+- `make check` is green.
+- The simulation tests pass.
+- The numeric-literal sweep leaves only hard bounds or trivial values outside `tuning.yaml`.
+- The dashboard and planner show the basis of every number.
+- A second run of `hostora learn` changes nothing (idempotent).
+
+### 24.12 Research basis
+
+- Gelman et al., *Bayesian Data Analysis* (3rd ed.): hierarchical Beta-Binomial and partial pooling.
+- Porteus, *Foundations of Stochastic Inventory Theory* (2002): newsvendor critical ratio.
+- Russo, Van Roy et al., "A Tutorial on Thompson Sampling" (2018).
+- Bradley & Terry (1952); Hunter, "MM algorithms for generalized Bradley–Terry models" (Annals of Statistics, 2004).
+- Klein & Moeschberger, *Survival Analysis* (2003): censored observations.
+- Gneiting & Raftery, "Strictly Proper Scoring Rules" (JASA, 2007): pinball loss.
+- Talts et al., "Validating Bayesian Inference Algorithms with Simulation-Based Calibration" (2018).
