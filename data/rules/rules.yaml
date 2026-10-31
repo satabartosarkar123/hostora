@@ -29,3 +29,21 @@ rules:
   vegan:
     label: Vegan
     forbid: [meat, fish, egg, allergen:dairy, honey, animal_product]
+
+# What diet words mean for grounding decisions (engine.grounding.semantics_from_data).
+# Editing here changes behaviour without code changes; a test keeps the engine's standalone
+# defaults identical to this block.
+semantics:
+  consumable_categories: [food, beverage]
+  # Tags that make a "decor" or "tableware" item count as food (so diet rules apply).
+  substance_tags: [meat, fish, egg, alcohol, root_veg, onion, garlic, honey, dairy]
+  # A source claiming this diet contradicts evidence of these tags.
+  diet_conflicts:
+    veg: [meat, fish, egg]
+    jain: [meat, fish, egg, root_veg, onion, garlic, alcohol, honey]
+    vegan: [meat, fish, egg, dairy, allergen:dairy, honey]
+    egg: [meat, fish]
+  # A source claiming this diet implies these tags (unspecified non-veg: assume the worst).
+  diet_implies:
+    egg: [egg]
+    nonveg: [meat, fish]

@@ -49,6 +49,7 @@ def data_check(
     typer.echo(
         f"Data version: {bundle.version}\n"
         f"Rules: {len(bundle.rules)}\n"
+        f"Semantics: {len(bundle.semantics.substance_tags)} substance tags\n"
         f"Channels: {len(bundle.channels)}\n"
         f"Concepts: {len(bundle.concept_map.get('open_food_facts_parents', {}))}\n"
         f"Sources: {len(bundle.sources)}"

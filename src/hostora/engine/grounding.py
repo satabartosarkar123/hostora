@@ -197,6 +197,47 @@ class Evidence:
     ingredients: tuple[str, ...] = ()
     agreement: float = 1.0  # share of sampled answers that agree (models); 1.0 otherwise
     citation: str | None = None  # URL or entity id; required for knowledge_base, web, label
+    absent: frozenset[str] = frozenset()  # tags this source says the item does NOT contain
+
+
+@dataclass(frozen=True, slots=True)
+class Semantics:
+    """What diet words mean for the decision. Loaded from ``rules.yaml`` (``semantics``) at
+    runtime; the defaults below only mirror that file so the engine works standalone."""
+
+    consumable_categories: frozenset[str]
+    substance_tags: frozenset[str]
+    diet_conflicts: Mapping[str, frozenset[str]]
+    diet_implies: Mapping[str, frozenset[str]]
+
+
+DEFAULT_SEMANTICS = Semantics(
+    consumable_categories=CONSUMABLE_CATEGORIES,
+    substance_tags=SUBSTANCE_TAGS,
+    diet_conflicts=_DIET_CONFLICTS,
+    diet_implies=_DIET_IMPLIES,
+)
+
+
+def semantics_from_data(data: Mapping[str, object]) -> Semantics:
+    """Build ``Semantics`` from the parsed ``semantics`` block of ``rules.yaml``."""
+
+    def tagset(value: object, name: str) -> frozenset[str]:
+        if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+            raise ValueError(f"semantics.{name} must be a list of strings")
+        return frozenset(value)
+
+    def tagmap(value: object, name: str) -> dict[str, frozenset[str]]:
+        if not isinstance(value, Mapping):
+            raise ValueError(f"semantics.{name} must be a mapping")
+        return {str(k): tagset(v, f"{name}.{k}") for k, v in value.items()}
+
+    return Semantics(
+        consumable_categories=tagset(data.get("consumable_categories"), "consumable_categories"),
+        substance_tags=tagset(data.get("substance_tags"), "substance_tags"),
+        diet_conflicts=tagmap(data.get("diet_conflicts"), "diet_conflicts"),
+        diet_implies=tagmap(data.get("diet_implies"), "diet_implies"),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,14 +274,21 @@ def ground(
     rules: Mapping[str, RuleSet],
     confirm: Mapping[str, Mapping[str, str]] | None = None,
     policy: GroundingPolicy | None = None,
+    semantics: Semantics | None = None,
 ) -> GroundedItem:
     """Decide whether ``item`` may enter a plan under ``rule_ids``.
 
     ``confirm``: rule id -> tag -> message for tags that need the host's confirmation (e.g.
     halal-certified meat). Only ``host`` or ``product_label`` evidence carrying
     ``confirmed:<rule id>`` satisfies it.
+
+    A tag that comes ONLY from words in the item's name (for example "egg" in "egg-free cake")
+    is dropped if a quorum of valid independent sources, including a non-model one, or one
+    authoritative source, says the item does not contain it, and no source's ingredients or
+    tags assert it. Any source asserting a tag always wins over absence claims.
     """
     policy = policy or GroundingPolicy()
+    sem = semantics or DEFAULT_SEMANTICS
     forbidden: set[str] = set()
     for rule_id in rule_ids:
         rule = rules.get(rule_id)
@@ -250,7 +298,9 @@ def ground(
 
     reasons: list[str] = []
     name_scan = vocabulary.scan(item.name)
-    tags: set[str] = set(name_scan.tags)
+    name_tags: set[str] = set(name_scan.tags)
+    tags: set[str] = set()  # tags asserted by evidence (ingredients, labels, models)
+    absent_support: dict[str, set[str]] = {}
     matched: list[str] = list(name_scan.matched)
     conflicts: set[str] = set(name_scan.conflicts)
     unknown: list[str] = list(name_scan.unknown)
@@ -265,7 +315,7 @@ def ground(
         if ev.source in _AUTHORITATIVE:
             confirmed.update(claimed)
         tags.update(ev.tags - claimed)  # negative evidence always counts (fail closed)
-        tags.update(_DIET_IMPLIES.get(ev.diet or "", frozenset()))
+        tags.update(sem.diet_implies.get(ev.diet or "", frozenset()))
 
         ev_unknown: list[str] = []
         for ingredient in ev.ingredients:
@@ -284,6 +334,10 @@ def ground(
         if family == "model" and ev.agreement < policy.min_agreement:
             reasons.append(f"{ev.source} answers disagreed ({ev.agreement:.0%} agreement)")
             continue
+        for t in ev.absent:
+            absent_support.setdefault(t, set()).add(
+                "authoritative" if ev.source in _AUTHORITATIVE else family
+            )
         explains = bool(ev.ingredients) and not ev_unknown
         if ev.source in _AUTHORITATIVE and (explains or "confirmed:composition" in claimed):
             authoritative = True
@@ -291,16 +345,23 @@ def ground(
         elif explains:
             supporting.add(family)
 
-    all_tags = frozenset(expand_tags(tags))
+    asserted = expand_tags(tags)
+    for t in sorted(name_tags - asserted):
+        fams = absent_support.get(t, set())
+        enough = "authoritative" in fams or (len(fams) >= policy.quorum and bool(fams - {"model"}))
+        if enough:
+            name_tags.discard(t)
+            reasons.append(f"name mentions {t}, but independent sources confirm it is absent")
+    all_tags = frozenset(expand_tags(name_tags | tags))
 
     category = item.category
-    if category not in CONSUMABLE_CATEGORIES and all_tags & SUBSTANCE_TAGS:
+    if category not in sem.consumable_categories and all_tags & sem.substance_tags:
         category = "food"
         reasons.append("looks like food or drink, so diet rules apply")
-    consumable = category in CONSUMABLE_CATEGORIES
+    consumable = category in sem.consumable_categories
 
     for ev in evidence:
-        clash = _DIET_CONFLICTS.get(ev.diet or "", frozenset()) & all_tags
+        clash = sem.diet_conflicts.get(ev.diet or "", frozenset()) & all_tags
         if clash:
             conflicts.update(clash)
             shown = ", ".join(sorted(clash))

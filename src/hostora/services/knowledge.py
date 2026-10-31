@@ -318,6 +318,7 @@ async def explain_dish(
         rule_ids=rule_ids,
         rules=rules,
         confirm=confirm,
+        semantics=data.semantics,
         policy=policy,
     )
     return result

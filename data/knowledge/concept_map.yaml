@@ -50,12 +50,7 @@ open_food_facts_properties:
     no: [animal_product]
     maybe: [animal_product]
 
-# Grammar, not food: phrases that cancel a tag inside the same text ("eggless cake").
-# A text that both cancels and asserts a tag ("eggless egg cake") goes to the host.
-negations:
-  - cancels: [egg]
-    forms: [eggless, egg free, egg-free, without egg, no egg, बिना अंडे, बिना अंडा]
-  - cancels: [onion, garlic]
-    forms: [no onion no garlic, without onion and garlic, बिना प्याज लहसुन]
-  - cancels: [alcohol]
-    forms: [non alcoholic, non-alcoholic, alcohol free, alcohol-free, mocktail]
+# No negation word list: "eggless", "egg-free", "बिना अंडे" and so on are handled at runtime.
+# Sources return the tags an item does NOT contain (Evidence.absent); a tag that comes only from
+# the item's name is dropped when a quorum of independent sources (including a non-AI one), or
+# a product label or the host, confirms it is absent and nothing asserts it.

@@ -10,6 +10,7 @@ import yaml
 
 from hostora.config import get_settings
 from hostora.engine.constraints import RuleSet
+from hostora.engine.grounding import Semantics, semantics_from_data
 from hostora.schemas.common import RuleId
 
 VALID_KINDS = {"quick", "food", "ecommerce"}
@@ -28,6 +29,7 @@ class DataBundle:
     version: str
     rules: dict[str, RuleSet]
     confirm: dict[str, dict[str, str]]
+    semantics: Semantics
     traditions: dict[str, Any]  # Any: free-form YAML shown in the wizard
     channels: dict[str, Channel]
     concept_map: dict[str, Any]
@@ -82,6 +84,14 @@ def load_data(data_dir: Path) -> DataBundle:
     if missing_rules:
         raise DataError(f"{rules_path.name}: missing RuleId definitions: {sorted(missing_rules)}")
 
+    semantics_raw = rules_raw.get("semantics")
+    if not isinstance(semantics_raw, dict):
+        raise DataError(f"{rules_path.name}: missing or invalid semantics block")
+    try:
+        semantics = semantics_from_data(semantics_raw)
+    except ValueError as e:
+        raise DataError(f"{rules_path.name}: {e}") from e
+
     # 2. Traditions
     traditions_raw = yaml.safe_load(traditions_path.read_text(encoding="utf-8")) or {}
 
@@ -115,8 +125,6 @@ def load_data(data_dir: Path) -> DataBundle:
         raise DataError(f"{concept_map_path.name}: missing open_food_facts_parents mapping")
     if not isinstance(concept_map_raw.get("open_food_facts_properties"), dict):
         raise DataError(f"{concept_map_path.name}: missing open_food_facts_properties mapping")
-    if not isinstance(concept_map_raw.get("negations"), list):
-        raise DataError(f"{concept_map_path.name}: missing negations list")
 
     # 5. Sources
     sources_raw = yaml.safe_load(sources_path.read_text(encoding="utf-8")) or {}
@@ -131,6 +139,7 @@ def load_data(data_dir: Path) -> DataBundle:
         version=version,
         rules=rules,
         confirm=confirm,
+        semantics=semantics,
         traditions=traditions_raw,
         channels=channels,
         concept_map=concept_map_raw,

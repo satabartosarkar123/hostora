@@ -250,6 +250,7 @@ async def execute_planner_steps(
             rule_ids=rule_ids,
             rules=data.rules,
             confirm=data.confirm,
+            semantics=data.semantics,
             policy=ground_policy,
         )
         if grounded.status == "allowed":
