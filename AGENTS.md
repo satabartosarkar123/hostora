@@ -40,7 +40,7 @@ This file is the single source of truth for building Hostora. It is written for 
 5. Never invent an external API. Where this file says **verify at build time**, check the provider's current documentation; if you cannot, keep the value in configuration or a data file so a human can fix it without code changes.
 6. Every external call (LLMs, Firebase key fetch) goes through an adapter in `src/hostora/adapters/`. Every adapter has a mock used by tests and by demo mode. Tests never hit the network unless marked `llm_live`.
 7. No secrets in code, tests, fixtures or git. `.env.example` lists names only. Tests generate throwaway keys.
-8. **LLMs propose items and words only.** Quantities, prices and diet and faith rule checks always come from `hostora.engine`. A plan item that fails `apply_rules` must never reach a response or the database, whatever the LLM returns.
+8. **The AI proposes freely; evidence and the engine decide.** There is no fixed list of dishes or items anywhere (section 23). Every AI-proposed item is grounded at runtime by `engine.grounding.ground` against live, cited evidence; quantities, prices and diet and faith decisions always come from `hostora.engine`. An item `ground` marks `removed` must never reach a plan, and a `needs_confirmation` item must never be treated as approved without the host's action.
 9. **Privacy:** never send phone numbers, household names or guest free text to any LLM. Diet and faith data appears only as totals to hosts and caterers, and never on the gate screen. Store phone numbers encrypted.
 10. Python 3.12+, type hints everywhere, `mypy --strict` clean. `Any` only with a comment explaining why. Use `async` for all I/O paths.
 11. Guest-facing pages must stay under the page-weight budget (section 11.4) and work without JavaScript for the core reply flow.
@@ -651,6 +651,10 @@ class GateManifest(ApiModel):
 
 ## 9. Data files and `src/hostora/data/loader.py` [M1]
 
+> **Superseded in part by section 23.** `catalog.csv` and `consumption.csv` no longer exist. The loader reads `rules.yaml` (now with `confirm`), `traditions.yaml`, `channels.yaml`, and `data/knowledge/concept_map.yaml` and `sources.yaml`. Dishes, ingredients, portions and prices are runtime data.
+
+
+
 Values marked `seed-unvalidated` are illustrative development numbers. Replace them with caterer-validated values before any real event (TDD 10.2), and say so in the README.
 
 | File | Format |
@@ -1181,6 +1185,10 @@ Then per function: `prediction = predict_arrivals(ReplySeats(yes_seats, maybe_se
 
 ### 10.9 Planner: `planner/pipeline.py` [M5]
 
+> **Steps 3–7 and the template fallback are superseded by section 23.4.** The streaming flow, stages and events still apply; add the stages `evidence` and `grounding`.
+
+
+
 Flow: `POST /v1/events/{k}/plans` (or the planner page form) redacts the brief, inserts a `plan` row with `status='running'`, and returns the stream URL. The page swaps in `<div hx-ext="sse" sse-connect="/v1/plans/{id}/stream" sse-swap="stage,category,done,error">`. The stream route runs the pipeline once (if a client reconnects after the plan is done, it replays the stored plan and closes). Events:
 
 ```
@@ -1644,6 +1652,10 @@ Accept: e2e passes; Google sign-in works on the deployed URL.
 
 ### M5 — Planner and shopping
 
+> Build the planner as specified in **section 23 (milestone M5-G)**, not from a catalog.
+
+
+
 Tasks: 10.9–10.11, `planner/redact.py`, LLM router and adapters with mocks, `llm_cache`; planner and budget pages; open every `channels.yaml` URL pattern in a browser and fix the YAML; tests 7, 8, 13 plus unit tests for commerce, redact and router (respx for Groq and Gemini, including 429 and malformed JSON); `tests/e2e/test_planner_flow.py` with the mock LLM: all categories stream, a brief asking for pork under halal shows it in "Removed", every item has at least one offer link.
 
 Accept: tests pass; with a real `GROQ_API_KEY` (marked `llm_live`), the first category arrives in under 15 s on the deployed app.
@@ -1834,3 +1846,209 @@ Use 3–4 of these, matched to the job. For backend roles lead with the RSVP and
 | How would you scale to 100× traffic? | Paid instances behind the load balancer, `LISTEN/NOTIFY` for SSE fan-out, Redis for rate limits and cache, a background worker for planner runs, read replicas for dashboards. |
 | What would you do differently? | Collect real outcome data earlier, because the prediction is only as good as its calibration. |
 | How do you handle personal data? | Phones encrypted with AES-GCM, IPs hashed, nothing personal sent to LLMs, totals only to caterers, deletion 90 days after the event, account deletion on request. |
+
+---
+
+## 23. Open-world, runtime-grounded planner (supersedes the catalog design)
+
+This section replaces every use of a fixed item catalog: the catalog and consumption rows in section 9, steps 3–7 of 10.9, the template fallback, and the price fields of the plan schema. **No list of dishes, drinks, decorations or supplies may exist anywhere in code, data, prompts or tests, except clearly labelled test fixtures.**
+
+### 23.1 Principles
+
+1. **The AI decides what.** The planning model proposes any dishes, drinks, decorations and supplies it judges right for this event, region, tradition, budget and brief. It is not choosing from a list.
+2. **Live evidence decides whether.** Each proposal is checked against evidence gathered at request time from independent sources: open knowledge bases, cited web pages, product labels and an independent verifier model. Nothing is approved from the planning model's word alone.
+3. **The engine decides how much and whether it is safe.** Quantities, prices and rule decisions come from `hostora.engine` (deterministic and property-tested), never from a model.
+4. **The host decides when the evidence is not enough.** Anything unproven is shown with its reasons and sources for the host to confirm, replace or remove.
+5. **The system learns from use.** Host confirmations, actual prices paid and post-event outcomes feed the knowledge cache, price observations and portion estimates.
+
+### 23.2 What is fixed, and why
+
+| Fixed | Why it is not a "list of items" |
+| --- | --- |
+| `data/rules/rules.yaml` (what halal, Jain, etc. forbid) | Definitions the host chooses and can adjust per event. Letting a model redefine "halal" is unsafe. |
+| `data/knowledge/concept_map.yaml` | Maps broad ontology concepts (for example `en:meat` or `en:egg` in Open Food Facts) to rule tags. Every food the sources know inherits tags through its parents. |
+| `data/knowledge/sources.yaml` | Endpoints, refresh intervals and policy (quorum, target error rate). |
+| `data/commerce/channels.yaml` | Shop search URL patterns: where to buy, not what to buy. |
+
+Everything else (dishes, ingredients, synonyms in any language, portions, prices, buy options) is retrieved, computed or learned at runtime.
+
+### 23.3 Engine modules (done, tested in `tests/engine/test_grounding.py`)
+
+| Module | Purpose |
+| --- | --- |
+| `engine/grounding.py` | `Vocabulary.build(concepts, negations)` turns runtime-fetched concept names (any script) into a phrase matcher; `ground(item, evidence, vocabulary, rule_ids, rules, confirm, policy)` returns `allowed` / `needs_confirmation` / `removed` with reasons, matched terms, supporting source families and citations; `quote_supported(ingredients, quotes)` drops extracted ingredients not literally present in retrieved quotes; `agreement(samples)` scores independent verifier answers. |
+| `engine/calibration.py` | `conformal_threshold(scores, unsafe, alpha)` picks the verifier-agreement threshold from labelled data so the bound on unsafe auto-approvals is ≤ `alpha`. |
+| `engine/portions.py` | `ServingKind` (portion per head for a *kind* of serving, e.g. "rice main"), `posterior_portion(prior, weight, outcomes)` updates portions from real event outcomes, clamped to 0.5×–2× the prior. |
+| `engine/pricing.py` | `choose_price(quotes, today)`: live > caterer quote > host-reported (median, range) > AI estimate, each with a freshness limit; `rank_options(options)`: priced options by unit price, then search links. |
+
+Decision rules in `ground` (fail-closed):
+- **Removed** if *any* source, however weak, uncited or low-agreement, links the item (name or any ingredient) to a forbidden tag.
+- **Allowed** under active rules only if a product label or the host vouches for the full composition, **or** at least `quorum` (default 2) independent source families fully explain the ingredients, including at least one non-model family. A family counts only if its ingredients are all resolved by the vocabulary, and a model family only if its agreement is at least `min_agreement`. Knowledge, web and label evidence count only with a citation. There must also be no contradictions (for example "said veg, evidence shows chicken", or "eggless egg cake") and no unresolved words in the name unless a non-model source explained the dish.
+- **Needs confirmation** otherwise, with the reasons listed. Rule `confirm` tags (halal meat) always need `confirmed:<rule>` from the host or a product label; a model saying "halal certified" is ignored.
+- Non-food categories that turn out to contain food substances are treated as food, so "Pork ribs" filed as decor is still caught.
+
+### 23.4 Pipeline (replaces 10.9 steps 3–7)
+
+1. **Context** (as before): predicted headcount split into adults and children and veg / Jain / non-veg seats; the function's rules (with per-event edits); budget; meal; region (state from pincode); tradition; redacted brief; days left.
+2. **Propose** (Groq large model, Pydantic-validated JSON `MenuProposal`). Per course, any number of dishes the model judges right, within an engine cap (`max_dishes(course, guests)` in policy config). For each item:
+   - `name`;
+   - `local_names` (optional);
+   - `category` and `course`;
+   - `serving_kind` (an existing serving-kind id, or `new:<snake_id>` with unit and course);
+   - `ingredients` (3–12 main ingredients);
+   - `declared_diet`;
+   - `why` (one line);
+   - `search_query`;
+   - `price_estimate` (low and high ₹ per unit);
+   - up to 2 `alternatives` (cheaper, or safer under the rules).
+
+   Non-food needs (decor, tableware, lighting, supplies) are proposed the same way, with `per_guests` or per-head basis.
+3. **Gather evidence** (in parallel, `asyncio.gather`, 6 s per source, 20 s total, cached facts first; one adapter per source under `adapters/knowledge/`):
+   - **Verifier** (`adapters/knowledge/verifier.py`): `policy.verifier_samples` independent calls (temperature 0.7, a different model or provider where available), each asked "what is usually in <dish> as cooked in <region>" **without** seeing the proposer's answer. Agreement = `engine.grounding.agreement` over the restricted-tag sets.
+   - **Knowledge base, Wikidata** (`wikidata.py`): `wbsearchentities` on the name and local names in the event languages → candidate items that are an instance or subclass of dish or food (verify the class ids) → SPARQL for `P186` (made from material) and `P527` (has part) → ingredient labels. Citation = the entity URL.
+   - **Knowledge base, Open Food Facts taxonomy** (`off.py`): the ingredients taxonomy (synonyms in many languages, parent concepts, vegan/vegetarian properties). It builds the **vocabulary**: every synonym → tags via `concept_map.yaml` parents and properties. Stored in `knowledge_concept` / `knowledge_form` and refreshed every `refresh_days`. Attribute Open Food Facts (ODbL) wherever its data is shown.
+   - **Web** (`web.py`): search-grounded extraction (Groq built-in browser search or Gemini Google Search grounding when `GEMINI_ALLOWED`; verify availability and free limits). The model must return ingredients plus `{url, quote}` sources. Keep only ingredients that pass `quote_supported`; drop the rest.
+   - **Product label** (`off.py` product search, later Swiggy Instamart MCP): for packaged items (soft drinks, boxed sweets, cakes from a brand), ingredients text, vegetarian/vegan analysis tags, labels (halal, vegetarian) and allergens. The citation is the product code or URL.
+   - **Cache**: fresh `knowledge_fact` rows are reused with their original source and citation.
+4. **Ground** each item with `engine.grounding.ground`, using the vocabulary from the cache and the policy from `grounding_policy`. Removed items are replaced by a grounded alternative when one exists.
+5. **Portions** per serving kind: `posterior_portion(prior, weight, outcomes)`.
+   - The prior comes from `portion_prior`, filled at runtime by web-grounded extraction of catering guidance with citations, per region.
+   - Outcomes come from `portion_outcome`.
+   - A new serving kind with no prior goes to "needs confirmation: portion unknown", and the host enters it.
+6. **Quantities**: `raw_quantity` with the serving kind's row, then `round_to_packs`, using product pack sizes when known, otherwise the serving kind's defaults.
+7. **Prices and options**:
+   - Quotes come from four sources: live store (when enabled), the host's caterer quote, `price_observation` (other hosts' real purchases in the same state, last 60 days, no personal data) and the proposer's estimate. `choose_price` picks among them.
+   - Options: live SKUs (when enabled) ranked by unit price, then search links from `channels.yaml` ordered by days left. Pass them through `rank_options` (up to 4).
+   - Every price shows its source and date: "Live · Instamart · today", "Paid by 7 hosts in West Bengal · ₹x–y", or "AI estimate".
+8. **Budget**: `fit_budget`, where alternatives are only grounded, allowed items.
+9. **Learn**: these feed back into the data:
+   - Confirm, replace and remove actions → `event_log`, plus `knowledge_fact` scoped to that host.
+   - "Mark bought" with the amount → `price_observation`.
+   - Post-event outcome (ran short / about right / leftover %) → `portion_outcome`.
+10. **No model available**: the planner still computes structure and quantities per serving kind and asks the host to type the dishes. Those are grounded with knowledge, web and label evidence only. There is no built-in dish list.
+
+### 23.5 Database (migration `0002_grounding`)
+
+```sql
+CREATE TABLE knowledge_concept (
+  id text PRIMARY KEY,                 -- e.g. 'off:en:chicken'
+  source text NOT NULL,                -- 'open_food_facts' | 'wikidata'
+  tags text[] NOT NULL DEFAULT '{}',
+  parents text[] NOT NULL DEFAULT '{}',
+  fetched_at timestamptz NOT NULL, expires_at timestamptz NOT NULL);
+CREATE TABLE knowledge_form (
+  form_norm text NOT NULL, lang text NOT NULL,
+  concept_id text NOT NULL REFERENCES knowledge_concept ON DELETE CASCADE,
+  PRIMARY KEY (form_norm, concept_id));
+CREATE TABLE knowledge_fact (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  subject_norm text NOT NULL, kind text NOT NULL,   -- 'dish_ingredients' | 'product' | 'portion'
+  source text NOT NULL, payload jsonb NOT NULL, citation text NOT NULL,
+  host_uid text,                                     -- set for host confirmations (private)
+  retrieved_at timestamptz NOT NULL, expires_at timestamptz NOT NULL);
+CREATE INDEX knowledge_fact_subject_idx ON knowledge_fact (subject_norm, kind);
+CREATE TABLE serving_kind (
+  id text PRIMARY KEY, course text NOT NULL, unit text NOT NULL CHECK (unit IN ('g','ml','piece')),
+  pack_sizes integer[] NOT NULL, per_guests integer, meal_factor jsonb,
+  created_by text NOT NULL CHECK (created_by IN ('model','host','system')), basis text NOT NULL);
+CREATE TABLE portion_prior (
+  serving_kind text NOT NULL REFERENCES serving_kind, region text NOT NULL,
+  per_adult double precision NOT NULL, per_child double precision NOT NULL,
+  weight double precision NOT NULL DEFAULT 5, citations text[] NOT NULL, updated_at timestamptz NOT NULL,
+  PRIMARY KEY (serving_kind, region));
+CREATE TABLE portion_outcome (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, function_id text NOT NULL,
+  serving_kind text NOT NULL, region text NOT NULL, planned_per_head double precision NOT NULL,
+  outcome text NOT NULL CHECK (outcome IN ('ran_short','about_right','leftover')),
+  leftover_fraction double precision NOT NULL DEFAULT 0, reported_at timestamptz NOT NULL);
+CREATE TABLE price_observation (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, item_norm text NOT NULL, unit text NOT NULL,
+  inr_per_unit double precision NOT NULL CHECK (inr_per_unit >= 0), region text NOT NULL,
+  source text NOT NULL CHECK (source IN ('host_reported','caterer_quote','live')),
+  observed_on date NOT NULL);
+CREATE INDEX price_observation_idx ON price_observation (item_norm, region, observed_on DESC);
+CREATE TABLE grounding_policy (
+  id smallint PRIMARY KEY DEFAULT 1 CHECK (id = 1), quorum smallint NOT NULL,
+  min_agreement double precision NOT NULL, alpha double precision NOT NULL,
+  n_calibration integer NOT NULL, risk_bound double precision NOT NULL, calibrated_at timestamptz NOT NULL);
+```
+
+The `serving_kind` table starts empty and is filled at runtime (proposals with `new:` ids are created with `created_by='model'` and need a cited portion prior or host input before use). The retention job does not touch these tables: they hold no personal data, except `knowledge_fact.host_uid` rows, which are deleted with the account.
+
+### 23.6 Schema changes (`schemas/plan.py`)
+
+`PlanItem` gains these fields:
+- `status` (`allowed` | `needs_confirmation`)
+- `serving_kind`
+- `why`
+- `grounding`: `{supporting, citations, reasons, matched}`
+- `price`: `{source, low, mid, high, observedOn, detail}`
+- `options`: up to 4, each `{channel, label, url, inrPerUnit?, packSize?, productName?}`
+- `alternatives`
+
+`Plan` gains `needsConfirmation: list[PlanItem]`, and `removed` items carry reasons and citations. `route` becomes `"groq" | "gemini" | "manual"`.
+
+New endpoints:
+- `POST /v1/plans/{plan_id}/items/{item_id}:confirm`, body `{confirmations: ["composition", "halal"]}`, records `host` evidence;
+- `:replace` with `{alternativeIndex}` or `{name}`;
+- `:remove`;
+- `POST /v1/events/{event_key}/outcome` extended with per-item outcomes for `portion_outcome`.
+
+### 23.7 UI
+
+The planner shows three panels: **Plan** (allowed), **Check these** (needs confirmation, each with reasons, "Checked by" sources with links, and Confirm / Replace / Remove), and **Removed** (rule and source). Each item shows its "why", serving kind, quantity basis ("Sized for 212 adults at 300 g, learned from 14 events in West Bengal"), price source and date, and up to 4 buy options. Open Food Facts and Wikidata attribution appears in the footer whenever their data is shown.
+
+### 23.8 CLI
+
+- `hostora knowledge-refresh`: fetch and rebuild the vocabulary from Open Food Facts; run from the `cron` workflow weekly.
+- `hostora calibrate --alpha 0.01`: run the labelled eval set through live evidence gathering, compute `conformal_threshold` on verifier agreement, and store it in `grounding_policy`, with n and the bound.
+- `hostora explain "<dish>" --rules halal,jain`: print every piece of evidence, citation and the decision. Great for demos and debugging.
+
+### 23.9 Tests and evals (add to sections 10.14, 22 and TESTING-AND-DEPLOY T2/T3/T5)
+
+- Engine: `tests/engine/test_grounding.py`, already 27 tests including properties:
+  - any source mentioning a forbidden concept removes the item;
+  - "allowed" always means safe and grounded by 2+ families, including a non-model one;
+  - removal agrees with `apply_rules`;
+  - the conformal threshold is valid and minimal;
+  - portions are monotone and clamped.
+- Adapters: respx-mocked tests for Wikidata, Open Food Facts, web extraction and the verifier, covering timeouts, empty results, malformed JSON and uncited claims. Live tests are marked `knowledge_live`.
+- Integration:
+  - planner with mocked sources for regional dishes **not seen anywhere in the codebase**;
+  - halal confirmation flow;
+  - host confirm, replace and remove;
+  - learning loops (a price observation changes the next plan's price source; ten "ran short" outcomes raise the next portion);
+  - no-model mode.
+- Evals (`data/evals/`): at least 300 cases across Indian regions and faiths:
+  - regional and Devanagari/Bengali/Tamil names;
+  - adversarial names ("veg galouti", "eggless cake with egg glaze", decor-labelled food, prompt injection in the brief);
+  - packaged products.
+
+  Report **unsafe auto-approvals (must be 0)**, auto-approval rate (usefulness), confirmation rate, removal rate, mean evidence latency, and the calibrated threshold with its bound. Put the numbers in `docs/metrics.md`.
+
+### 23.10 Honest limits (put these in the README)
+
+- Open knowledge bases cover Indian regional dishes unevenly, so more items will ask for confirmation at first. That is by design, and the share falls as the cache and host confirmations grow.
+- Sources can be wrong. The system never approves on one source, always shows its evidence, and the host has the final say ("check with your caterer").
+- Without a live store connection, prices are learned from real purchases or labelled as AI estimates; "cheapest" is only claimed among live-checked options.
+
+### 23.11 Research basis
+
+- Chain-of-Verification: Dhuliawala et al., ACL Findings 2024. Independent verification questions answered without seeing the draft.
+- SelfCheckGPT: Manakul et al., EMNLP 2023. Consistency across samples as a hallucination signal.
+- Retrieval-augmented generation: Lewis et al., NeurIPS 2020; Self-RAG, Asai et al., ICLR 2024. Ground claims in retrieved text with citations.
+- FActScore: Min et al., EMNLP 2023. Break output into atomic claims (here, ingredients) and check each one.
+- Mitigating LLM Hallucinations via Conformal Abstention: Abbasi Yadkori et al., 2024; Conformal Risk Control: Angelopoulos et al., ICLR 2024. Data-driven abstention thresholds with error guarantees.
+- FoodKG: Haussmann et al., ISWC 2019. Food knowledge graphs linking recipes, ingredients and properties.
+- Data: Open Food Facts (ODbL), Wikidata (CC0).
+
+### 23.12 Milestone M5-G (replaces M5's catalog work)
+
+Tasks: migration `0002_grounding`; `adapters/knowledge/*`; vocabulary builder and `knowledge-refresh`; the new pipeline (23.4); schema and UI changes; endpoints; CLI `calibrate` and `explain`; remove every catalog reference; tests and evals in 23.9.
+
+Accept:
+- `grep -ri "catalog" src/` finds no item list;
+- all tests pass;
+- evals show 0 unsafe auto-approvals;
+- `hostora explain "galouti kebab" --rules pure_veg` shows removal with a Wikidata or web citation;
+- a plan for an event in Kolkata and one in Chennai contain different, regionally appropriate dishes, none of which appear anywhere in the repository.
