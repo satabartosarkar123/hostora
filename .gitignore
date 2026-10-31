@@ -1,12 +1,31 @@
-node_modules/
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.egg-info/
+build/
 dist/
-.wrangler/
-.dev.vars
+
+# Env and secrets
 .env
-*.log
-coverage/
+.env.*
+!.env.example
+
+# Test and tool output
 playwright-report/
 test-results/
+loadtest/results/
+*.log
+
+# OS and editors
 .DS_Store
-__pycache__/
-.venv/
+.idea/
+.vscode/
