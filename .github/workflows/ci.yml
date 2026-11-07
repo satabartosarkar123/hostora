@@ -41,7 +41,19 @@ jobs:
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy
       - run: uv run hostora data-check
-      - run: DATABASE_URL=$TEST_DATABASE_URL uv run alembic upgrade head && DATABASE_URL=$TEST_DATABASE_URL uv run alembic check
-      - run: uv run pytest -m "not e2e and not llm_live" --cov --cov-report=xml --cov-report=term
+      - name: Ensure postgres databases exist
+        run: |
+          uv run python -c "
+          import asyncio, asyncpg
+          async def main():
+              conn = await asyncpg.connect('postgresql://hostora:hostora@localhost:5432/hostora_test')
+              exists = await conn.fetchval(\"SELECT 1 FROM pg_database WHERE datname = 'hostora'\")
+              if not exists:
+                  await conn.execute('CREATE DATABASE hostora')
+              await conn.close()
+          asyncio.run(main())
+          "
+      - run: uv run alembic upgrade head && DATABASE_URL=$TEST_DATABASE_URL uv run alembic upgrade head && DATABASE_URL=$TEST_DATABASE_URL uv run alembic check
+      - run: uv run pytest -m "not e2e and not llm_live and not store_live" --cov --cov-report=xml --cov-report=term
       - run: uv run coverage report --fail-under=85
       - run: uv run coverage report --include='src/hostora/engine/*' --fail-under=95

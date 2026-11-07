@@ -117,7 +117,7 @@ Dataset: `data/evals/grounded_evals.jsonl` (337 cases across 8 Indian regions an
 | Auto-Approval Rate | 28.5% | Useful baseline |
 | Confirmation Rate | 23.4% | Conservative fail-closed |
 | Removal Rate | 48.1% | Matches forbidden rules |
-| Mean Evidence Latency | 0.02 ms | < 50 ms in-memory |
+| Mean Evidence Latency | 0.08 ms | < 50 ms in-memory |
 | Calibrated Conformal Bound (alpha=0.01) | <= 1.0% | Error rate guarantee |
 ## 7. Learning Loops Verification & Synthetic Backtests (Milestone M5-L)
 

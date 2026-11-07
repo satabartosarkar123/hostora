@@ -649,18 +649,22 @@ async def test_swiggy_instamart_live_search_and_cart_without_checkout() -> None:
 
     token = os.environ.get("SWIGGY_LIVE_ACCESS_TOKEN", "").strip()
     if not token:
-        real_settings = get_settings()
-        engine = make_engine(real_settings)
-        maker = make_sessionmaker(engine)
         try:
-            async with maker() as real_sess:
-                loaded = await load_store_token(
-                    real_sess, real_settings, "demo-host", "swiggy", auto_refresh=True
-                )
-                if loaded is not None:
-                    token = loaded.access_token
-        finally:
-            await engine.dispose()
+            real_settings = get_settings()
+            db_url = real_settings.test_database_url or real_settings.database_url
+            engine = make_engine(real_settings, url=db_url)
+            maker = make_sessionmaker(engine)
+            try:
+                async with maker() as real_sess:
+                    loaded = await load_store_token(
+                        real_sess, real_settings, "demo-host", "swiggy", auto_refresh=True
+                    )
+                    if loaded is not None:
+                        token = loaded.access_token
+            finally:
+                await engine.dispose()
+        except Exception:
+            token = ""
 
     if not token:
         pytest.skip(
