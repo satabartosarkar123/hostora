@@ -33,7 +33,7 @@ jobs:
       CRON_SECRET: test-cron-secret-32-chars-long-12345678
       DEMO_MODE: "true"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
