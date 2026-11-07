@@ -1550,6 +1550,8 @@ services:
         sync: false
       - key: PHONE_ENC_KEY
         sync: false
+      - key: STORE_TOKEN_KEY
+        sync: false
       - key: PASS_SIGNING_KEY
         sync: false
       - key: PASS_PUBLIC_KEY
@@ -1583,6 +1585,7 @@ Verify the Blueprint keys against Render's Blueprint specification at build time
 | `SECRET_KEY` | app | yes | session cookie signing |
 | `TOKEN_HMAC_SECRET` | app | yes | link tokens, gate tokens, IP hashes, phone hashes |
 | `PHONE_ENC_KEY` | app | yes | base64, 32 bytes |
+| `STORE_TOKEN_KEY` | app | yes | base64, 32 bytes (AES-GCM for store OAuth tokens) |
 | `PASS_SIGNING_KEY` | app | yes | Ed25519 private key, hex |
 | `PASS_PUBLIC_KEY` | app | yes | Ed25519 public key, hex (public) |
 | `CRON_SECRET` | app + GitHub secret | yes | signs cron calls |
@@ -2206,3 +2209,47 @@ Accept:
 - Klein & Moeschberger, *Survival Analysis* (2003): censored observations.
 - Gneiting & Raftery, "Strictly Proper Scoring Rules" (JASA, 2007): pinball loss.
 - Talts et al., "Validating Bayesian Inference Algorithms with Simulation-Based Calibration" (2018).
+
+
+## 25. Real-time ordering: time left, live stores, one-tap carts
+
+### 25.1 Principles
+1. **Time is minutes until the function starts**, computed in `Asia/Kolkata` from the function's `starts_at`. There is no "days left" routing anywhere.
+2. **Feasibility comes before preference.** A shop is shown for an item only if `engine.delivery.feasible(eta, minutes_left, safety)` holds. The ETA comes from, in order of preference: a live ETA from a connected store, then `learned_eta` from hosts' reported delivery times, then the shop's declared promise in `channels.yaml`. Learning (`engine.bandit`) only reorders feasible shops.
+3. **Real connections where official ones exist.**
+   - Swiggy Instamart and Swiggy Food: Swiggy Builders Club MCP servers, OAuth on the host's own Swiggy account.
+   - Zomato: the official MCP server `https://mcp-server.zomato.com/mcp`, phone OTP OAuth; Zomato must allowlist the app's OAuth redirect.
+   - Blinkit and Zepto have no official API. Never automate their websites; use their search links plus a copyable list.
+4. **The host stays in control of money.** Hostora fills carts in the host's own store account and opens that store's checkout. It never takes payment and never places an order without the host's final confirmation inside the store's own flow.
+5. **Fewest carts.** `engine.delivery.plan_carts` covers the whole list with as few stores as possible. It shows "everything arrives by HH:MM" and lists anything no shop can deliver in time.
+
+### 25.2 Store adapters (`src/hostora/adapters/stores/`)
+- `mcp_client.py`: the official Python MCP SDK (`mcp` package; verify the current version and API) over streamable HTTP, with OAuth 2.1 + PKCE per host.
+  - Tokens are stored encrypted with AES-GCM under a new secret `STORE_TOKEN_KEY` in `store_connection(host_uid, store, token_enc, scopes, connected_at, expires_at)`, and refreshed automatically.
+  - Tokens are deleted on disconnect and on account deletion, and never logged.
+- `swiggy.py`, `zomato.py`: discover tools at runtime with MCP `list_tools` and map them by capability (search products, search restaurants/menus, ETA, cart add/view, checkout link, order status) using the tool names and descriptions. Record the verified mapping in `data/knowledge/sources.yaml` and add a contract test that fails loudly when a tool disappears or changes its schema.
+- **Offers from live stores:** real product or dish name, pack size, price, availability and ETA for the venue address (or the host's chosen delivery address), mapped into `engine.delivery.Offer` and `engine.pricing.BuyOption`. Live prices take part in `choose_price` with source `live`.
+- **Feature flags** live in `sources.yaml` (`stores.swiggy.enabled`, `stores.zomato.enabled`, `mode: localhost|production`). Before production approval or allowlisting, the UI shows a "Connect" button that explains the store is not approved yet and falls back to search links. Nothing breaks.
+
+### 25.3 Urgent mode
+When `minutes_left` is below `tuning.urgent_mode_minutes` (a prior; learned from host behaviour later), the planner:
+- prefers ready-to-eat dishes from nearby restaurants (live menus) over raw ingredients;
+- sends groceries and supplies to quick commerce;
+- drops anything that cannot arrive in time into an **"Won't arrive in time"** panel with grounded alternatives that can;
+- shows the arrival time for each cart.
+
+The safety margin is `tuning.delivery_safety_minutes` (prior 30). It is learned upward when hosts report late deliveries.
+
+### 25.4 Learning and privacy
+- After each order, ask "When did it arrive?" (or read the store's order-status tool). The answer feeds `delivery_report(channel, region, item_kind, promised_max, actual_minutes, reported_at)`, then `learned_eta` and the safety margin.
+- Only the delivery address and item queries go to a store the host connected. Household names, phones, diet data and briefs never go to any store. Log MCP calls without their payloads.
+
+### 25.5 Milestone M5-R and acceptance
+Tasks: 25.1–25.4, migration `0004_stores`, UI ("Connect Swiggy", "Connect Zomato", "Build carts", the cart summary with arrival times, the "Won't arrive in time" panel, "When did it arrive?"), tests.
+
+Accept:
+- With a function starting in 120 minutes, no shop with a multi-day ETA appears anywhere.
+- With Swiggy connected on localhost and the host's own account, a plan shows real Instamart products with live prices and ETAs, and "Build carts" fills the host's Instamart cart without placing an order.
+- With stores disconnected, the same plan still works with feasible search links.
+- All tests and gates are green.
+

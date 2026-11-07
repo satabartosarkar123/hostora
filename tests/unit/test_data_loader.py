@@ -69,4 +69,4 @@ def test_cli_data_check_and_gen_keys() -> None:
 
     keys_res = runner.invoke(app, ["gen-keys"])
     assert keys_res.exit_code == 0
-    assert len(keys_res.stdout.strip().splitlines()) == 6
+    assert len(keys_res.stdout.strip().splitlines()) == 7

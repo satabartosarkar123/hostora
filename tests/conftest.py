@@ -74,6 +74,7 @@ def settings() -> Settings:
         secret_key=secrets.token_urlsafe(48),
         token_hmac_secret=secrets.token_urlsafe(48),
         phone_enc_key=base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
+        store_token_key=base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
         pass_signing_key=priv_hex,
         pass_public_key=pub_hex,
         cron_secret=secrets.token_urlsafe(32),

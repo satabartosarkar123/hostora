@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     secret_key: SecretStr
     token_hmac_secret: SecretStr
     phone_enc_key: SecretStr
+    store_token_key: SecretStr = SecretStr("")
     pass_signing_key: SecretStr
     pass_public_key: str
     cron_secret: SecretStr
