@@ -39,6 +39,22 @@ hypothesis_settings.load_profile(os.getenv("HYPOTHESIS_PROFILE", "default"))
 
 _MIGRATED_URLS: set[str] = set()
 
+# Populate throwaway test keys in environment so get_settings() works in headless CI
+_priv_hex, _pub_hex = generate_key_pair_hex()
+_test_defaults = {
+    "SECRET_KEY": secrets.token_urlsafe(48),
+    "TOKEN_HMAC_SECRET": secrets.token_urlsafe(48),
+    "PHONE_ENC_KEY": base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
+    "STORE_TOKEN_KEY": base64.b64encode(secrets.token_bytes(32)).decode("ascii"),
+    "PASS_SIGNING_KEY": _priv_hex,
+    "PASS_PUBLIC_KEY": _pub_hex,
+    "CRON_SECRET": secrets.token_urlsafe(32),
+    "DEMO_MODE": "true",
+}
+for _k, _v in _test_defaults.items():
+    if _k not in os.environ:
+        os.environ[_k] = _v
+
 
 def _read_dotenv_map() -> dict[str, str]:
     env_path = Path(".env")
