@@ -51,7 +51,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for item in insights.items %}
+        {% for item in insights["items"] %}
         <tr style="border-bottom:1px solid var(--border);">
           <td style="padding:0.6rem; font-family:monospace; font-size:0.9rem;"><strong>{{ item.name }}</strong></td>
           <td style="padding:0.6rem;">{{ item.value }}</td>

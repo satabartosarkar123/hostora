@@ -578,12 +578,104 @@ async def test_knowledge_services_and_host_planner_html_routes(
         r = await client.get(path)
         assert r.status_code == 200, f"Expected 200 for {path}, got {r.status_code}"
 
-    # Trigger HTML plan generation via HTMX POST
+    # Additional host routes coverage (insights, slider, rules, preferences, store connect)
     import re
 
     settings_html = (await client.get("/app/settings")).text
     m_csrf = re.search(r'name="csrf_token"\s+value="([^"]+)"', settings_html)
-    csrf_cookie = m_csrf.group(1) if m_csrf else ""
+    csrf_cookie = m_csrf.group(1) if m_csrf else client.cookies.get("hostora_csrf", "")
+    csrf_hdr = {"X-CSRF-Token": csrf_cookie}
+
+    r_ins = await client.get("/app/insights")
+    assert r_ins.status_code == 200
+
+    r_sl = await client.post(
+        "/app/e/DEM01/slider",
+        data={"slider": "7", "csrf_token": csrf_cookie},
+        headers={"hx-request": "true", **csrf_hdr},
+    )
+    assert r_sl.status_code == 200
+
+    r_cr = await client.post(
+        "/app/e/DEM01/rules/custom",
+        data={
+            "function_id": fn_id,
+            "rule_name": "no_peanuts",
+            "forbid_tag": "peanut",
+            "csrf_token": csrf_cookie,
+        },
+        headers=csrf_hdr,
+    )
+    assert r_cr.status_code == 303
+
+    r_bp = await client.post(
+        "/app/e/DEM01/budget/preference",
+        json={"winner": "item_1", "loser": "item_2"},
+        headers=csrf_hdr,
+    )
+    assert r_bp.status_code == 200
+
+    r_g1 = await client.post(
+        "/app/e/DEM01/guests",
+        data={
+            "display_name": "Priya Sharma",
+            "seat_cap": "2",
+            "language": "en",
+            "function_ids": [fn_id],
+            "csrf_token": csrf_cookie,
+        },
+        headers=csrf_hdr,
+    )
+    assert r_g1.status_code == 303
+
+    r_g2 = await client.post(
+        "/app/e/DEM01/guests",
+        data={
+            "display_name": "",
+            "seat_cap": "invalid",
+            "language": "en",
+            "csrf_token": csrf_cookie,
+        },
+        headers=csrf_hdr,
+    )
+    assert r_g2.status_code == 422
+
+    r_sw = await client.post(
+        "/app/settings/stores/swiggy/connect",
+        data={"access_token": "manual_tok_123", "csrf_token": csrf_cookie},
+        headers=csrf_hdr,
+    )
+    assert r_sw.status_code == 303
+
+    r_sw_dc = await client.post(
+        "/app/settings/stores/swiggy/disconnect",
+        data={"csrf_token": csrf_cookie},
+        headers=csrf_hdr,
+    )
+    assert r_sw_dc.status_code == 303
+
+    r_zm = await client.post(
+        "/app/settings/stores/zomato/connect",
+        data={"access_token": "manual_tok_456", "csrf_token": csrf_cookie},
+        headers=csrf_hdr,
+    )
+    assert r_zm.status_code == 303
+
+    r_zm_dc = await client.post(
+        "/app/settings/stores/zomato/disconnect",
+        data={"csrf_token": csrf_cookie},
+        headers=csrf_hdr,
+    )
+    assert r_zm_dc.status_code == 303
+
+    r_del = await client.post(
+        "/app/settings/delete",
+        data={"confirm": "NO", "csrf_token": csrf_cookie},
+        headers=csrf_hdr,
+    )
+    assert r_del.status_code == 422
+
+    # Trigger HTML plan generation via HTMX POST
     gen_r = await client.post(
         f"/app/e/DEM01/plan/{fn_id}",
         data={"brief": "Quick party", "minutes_left": "120", "csrf_token": csrf_cookie},
