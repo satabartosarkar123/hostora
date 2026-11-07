@@ -38,7 +38,25 @@ def test_channel_missing_q_placeholder_fails(tmp_path: Path) -> None:
     text = channels_file.read_text(encoding="utf-8").replace("{q}", "fixed")
     channels_file.write_text(text, encoding="utf-8")
 
-    with pytest.raises(DataError, match="blinkit"):
+    with pytest.raises(DataError, match=r"channels\.yaml"):
+        load_data(tmp_path / "data")
+
+
+def test_channel_invalid_eta_or_connect_fails(tmp_path: Path) -> None:
+    shutil.copytree(Path("data"), tmp_path / "data")
+    channels_file = tmp_path / "data" / "commerce" / "channels.yaml"
+    orig = channels_file.read_text(encoding="utf-8")
+
+    channels_file.write_text(
+        orig.replace("eta_minutes: [10, 30]", "eta_minutes: [50, 10]"), encoding="utf-8"
+    )
+    with pytest.raises(DataError, match="eta_minutes"):
+        load_data(tmp_path / "data")
+
+    channels_file.write_text(
+        orig.replace("connect: zomato_mcp", "connect: unknown_mcp"), encoding="utf-8"
+    )
+    with pytest.raises(DataError, match="invalid connect"):
         load_data(tmp_path / "data")
 
 

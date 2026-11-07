@@ -1,11 +1,45 @@
-# Search URL patterns. {q} is replaced with the URL-encoded search query.
-# VERIFY EACH PATTERN IN M5 by opening it in a browser. Fix here, never in code.
-# Phase A: no affiliate parameters.
+# Where to buy (not what to buy). {q} is replaced with the URL-encoded search query.
+# eta_minutes is each shop's own declared delivery promise, used only as a cold-start prior:
+# it is replaced by live ETAs from connected stores and by hosts' reported delivery times
+# (engine.delivery.learned_eta). A shop whose ETA cannot fit the time left is never shown.
+# "connect" names the official integration, if any. Shops without one open their search page.
+# VERIFY every URL pattern and ETA promise at build time. Phase A: no affiliate parameters.
 channels:
-  blinkit:     { label: Blinkit,          kind: quick,     search: "https://blinkit.com/s/?q={q}" }
-  zepto:       { label: Zepto,            kind: quick,     search: "https://www.zeptonow.com/search?query={q}" }
-  instamart:   { label: Swiggy Instamart, kind: quick,     search: "https://www.swiggy.com/instamart/search?query={q}" }
-  swiggy_food: { label: Swiggy,           kind: food,      search: "https://www.swiggy.com/search?query={q}" }
-  zomato:      { label: Zomato,           kind: food,      search: "https://www.zomato.com/search?q={q}" }
-  amazon:      { label: Amazon,           kind: ecommerce, search: "https://www.amazon.in/s?k={q}" }
-  flipkart:    { label: Flipkart,         kind: ecommerce, search: "https://www.flipkart.com/search?q={q}" }
+  instamart:
+    label: Swiggy Instamart
+    kind: quick
+    search: "https://www.swiggy.com/instamart/search?query={q}"
+    eta_minutes: [10, 30]
+    connect: swiggy_mcp_instamart
+  swiggy_food:
+    label: Swiggy
+    kind: food
+    search: "https://www.swiggy.com/search?query={q}"
+    eta_minutes: [25, 60]
+    connect: swiggy_mcp_food
+  zomato:
+    label: Zomato
+    kind: food
+    search: "https://www.zomato.com/search?q={q}"
+    eta_minutes: [25, 60]
+    connect: zomato_mcp
+  blinkit:
+    label: Blinkit
+    kind: quick
+    search: "https://blinkit.com/s/?q={q}"
+    eta_minutes: [10, 30]
+  zepto:
+    label: Zepto
+    kind: quick
+    search: "https://www.zeptonow.com/search?query={q}"
+    eta_minutes: [10, 30]
+  amazon:
+    label: Amazon
+    kind: ecommerce
+    search: "https://www.amazon.in/s?k={q}"
+    eta_minutes: [1440, 4320]
+  flipkart:
+    label: Flipkart
+    kind: ecommerce
+    search: "https://www.flipkart.com/search?q={q}"
+    eta_minutes: [1440, 4320]

@@ -14,6 +14,7 @@ from hostora.engine.grounding import Semantics, semantics_from_data
 from hostora.schemas.common import RuleId
 
 VALID_KINDS = {"quick", "food", "ecommerce"}
+VALID_CONNECTS = {"swiggy_mcp_instamart", "swiggy_mcp_food", "zomato_mcp"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +23,8 @@ class Channel:
     label: str
     kind: Literal["quick", "food", "ecommerce"]
     url: str
+    eta_minutes: tuple[float, float] = (10.0, 30.0)
+    connect: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,11 +124,33 @@ def load_data(data_dir: Path) -> DataBundle:
                 "channel URL must start with https:// and include '{q}'"
             )
             raise DataError(msg)
+        eta_raw = ch_def.get("eta_minutes")
+        if (
+            not isinstance(eta_raw, (list, tuple))
+            or len(eta_raw) != 2
+            or not isinstance(eta_raw[0], (int, float))
+            or not isinstance(eta_raw[1], (int, float))
+            or isinstance(eta_raw[0], bool)
+            or isinstance(eta_raw[1], bool)
+            or float(eta_raw[0]) < 0
+            or float(eta_raw[1]) < float(eta_raw[0])
+        ):
+            raise DataError(
+                f"{channels_path.name} ({ch_id}): "
+                "eta_minutes must be [min, max] with 0 <= min <= max"
+            )
+        connect_raw = ch_def.get("connect")
+        if connect_raw is not None and (
+            not isinstance(connect_raw, str) or connect_raw not in VALID_CONNECTS
+        ):
+            raise DataError(f"{channels_path.name} ({ch_id}): invalid connect '{connect_raw}'")
         channels[ch_id] = Channel(
             id=ch_id,
             label=str(ch_def.get("label") or ch_id),
             kind=cast(Literal["quick", "food", "ecommerce"], kind),
             url=url,
+            eta_minutes=(float(eta_raw[0]), float(eta_raw[1])),
+            connect=connect_raw,
         )
 
     # 4. Concept Map
