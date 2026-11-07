@@ -18,9 +18,9 @@ def make_engine(settings: Settings, url: str | None = None) -> AsyncEngine:
     return create_async_engine(
         target_url,
         connect_args=connect_args,
-        pool_size=5,
-        max_overflow=5,
-        pool_pre_ping=True,
+        pool_size=20,
+        max_overflow=30,
+        pool_pre_ping=False,
         pool_recycle=300,
     )
 

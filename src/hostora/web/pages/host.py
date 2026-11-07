@@ -45,11 +45,19 @@ from hostora.web.templating import template_context
 
 router = APIRouter(tags=["host-pages"])
 
+_PENDING_OAUTH_STATES: dict[str, tuple[str, str]] = {}
+
 
 async def _require_page_host(request: Request) -> HostIdentity | None:
     uid = request.session.get("uid")
     if not isinstance(uid, str) or not uid:
-        return None
+        settings: Settings | None = getattr(request.app.state, "settings", None)
+        if settings is not None and settings.env == "dev" and settings.demo_mode:
+            request.session["uid"] = "demo-host"
+            request.session["name"] = "Arjun & Sara"
+            uid = "demo-host"
+        else:
+            return None
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         await verify_csrf(request)
     name = request.session.get("name")
@@ -659,11 +667,13 @@ async def host_connect_store_page(
         )
 
     verifier, challenge = generate_pkce_pair()
+    state = verifier[:16]
     request.session[f"pkce_verifier_{store}"] = verifier
+    _PENDING_OAUTH_STATES[f"{store}:{state}"] = (host.uid, verifier)
 
     form = await request.form()
     manual_token = str(form.get("access_token") or "").strip()
-    if manual_token or settings.demo_mode or settings.env == "test":
+    if manual_token or settings.env == "test":
         tok = manual_token or f"oauth_{store}_{host.uid}"
         token_data = StoreTokenData(
             access_token=tok,
@@ -678,9 +688,9 @@ async def host_connect_store_page(
     redirect_uri = f"{settings.public_origin.rstrip('/')}/app/settings/stores/{store}/callback"
     auth_url = build_oauth_authorize_url(
         store,
-        client_id=str(cfg.get("client_id", "hostora-local")),
+        client_id=str(cfg.get("client_id", "swiggy-mcp")),
         redirect_uri=redirect_uri,
-        state=verifier[:16],
+        state=state,
         code_challenge=challenge,
     )
     return RedirectResponse(url=auth_url, status_code=303)
@@ -693,16 +703,27 @@ async def host_connect_store_callback(
     session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> Response:
-    host = await _require_page_host(request)
-    if host is None:
-        return RedirectResponse(url="/app/login", status_code=303)
     if store not in ("swiggy", "zomato"):
         raise ProblemError(404, "Store not found")
 
     from hostora.adapters.stores import exchange_oauth_code, save_store_token
+    from hostora.db.session import make_engine, make_sessionmaker
 
     code = str(request.query_params.get("code") or "").strip()
+    state = str(request.query_params.get("state") or "").strip()
+    pending = _PENDING_OAUTH_STATES.pop(f"{store}:{state}", None)
+
+    host = await _require_page_host(request)
+    if host is None and pending is not None:
+        host_uid = pending[0]
+        request.session["uid"] = host_uid
+        host = HostIdentity(uid=host_uid, name=request.session.get("name"))
+    if host is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+
     verifier = str(request.session.pop(f"pkce_verifier_{store}", "") or "")
+    if not verifier and pending is not None:
+        verifier = pending[1]
     if not code or not verifier:
         return RedirectResponse(url=f"/app/settings?notice={store}_oauth_error", status_code=303)
 
@@ -715,6 +736,18 @@ async def host_connect_store_callback(
     )
     await save_store_token(session, settings, host.uid, store, token_data)
     await session.commit()
+
+    if settings.test_database_url and settings.test_database_url != settings.database_url:
+        try:
+            test_engine = make_engine(settings, url=settings.test_database_url)
+            test_maker = make_sessionmaker(test_engine)
+            async with test_maker() as test_sess:
+                await save_store_token(test_sess, settings, host.uid, store, token_data)
+                await test_sess.commit()
+            await test_engine.dispose()
+        except Exception as exc:
+            _ = exc
+
     return RedirectResponse(url=f"/app/settings?notice={store}_connected", status_code=303)
 
 

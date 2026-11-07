@@ -32,28 +32,32 @@ stores:
   swiggy:
     enabled: true
     mode: localhost   # localhost | production
+    client_id: "swiggy-mcp"
     instamart_mcp_url: "https://mcp.swiggy.com/im"
     food_mcp_url: "https://mcp.swiggy.com/food"
-    oauth_authorize_url: "https://mcp.swiggy.com/oauth/authorize"
-    oauth_token_url: "https://mcp.swiggy.com/oauth/token"
+    oauth_authorize_url: "https://mcp.swiggy.com/auth/authorize"
+    oauth_token_url: "https://mcp.swiggy.com/auth/token"
+    oauth_register_url: "https://mcp.swiggy.com/auth/register"
     checkout_instamart_url: "https://www.swiggy.com/instamart/checkout"
     checkout_food_url: "https://www.swiggy.com/checkout"
     capabilities:
       search_products: ["search_products", "instamart_search_products"]
-      search_restaurants: ["search_restaurants", "search_dishes"]
-      get_menu: ["get_menu", "get_restaurant_menu"]
-      eta: ["get_eta", "check_serviceability", "get_addresses"]
-      cart_add: ["add_to_cart", "update_food_cart", "update_instamart_cart"]
-      cart_view: ["get_cart", "view_cart"]
+      search_restaurants: ["search_restaurants", "search_menu", "search_dishes"]
+      get_menu: ["get_restaurant_menu", "search_menu", "get_menu"]
+      eta: ["get_addresses", "get_delivery_status", "get_food_delivery_status", "get_eta", "check_serviceability"]
+      cart_add: ["update_cart", "update_food_cart", "add_to_cart", "update_instamart_cart"]
+      cart_view: ["get_cart", "get_food_cart", "view_cart"]
       checkout_link: ["get_checkout_url", "checkout_link"]
-      order_status: ["get_order_status", "track_order"]
-      forbidden_tools: ["place_food_order", "place_instamart_order", "place_order", "create_order", "pay_order", "confirm_payment"]
+      order_status: ["track_order", "track_food_order", "get_orders", "get_food_orders", "get_order_status"]
+      forbidden_tools: ["checkout", "place_food_order", "confirm_order", "check_payment_status", "get_payment_options", "place_instamart_order", "place_order", "create_order", "pay_order", "confirm_payment"]
   zomato:
     enabled: false
     mode: localhost   # localhost | production (requires Zomato OAuth redirect allowlisting)
+    client_id: "hostora-local"
     mcp_url: "https://mcp-server.zomato.com/mcp"
-    oauth_authorize_url: "https://mcp-server.zomato.com/oauth/authorize"
-    oauth_token_url: "https://mcp-server.zomato.com/oauth/token"
+    oauth_authorize_url: "https://mcp-server.zomato.com/authorize"
+    oauth_token_url: "https://mcp-server.zomato.com/token"
+    oauth_register_url: "https://mcp-server.zomato.com/register"
     checkout_url: "https://www.zomato.com/checkout"
     capabilities:
       search_restaurants: ["get_restaurants_for_keyword", "search_restaurants"]

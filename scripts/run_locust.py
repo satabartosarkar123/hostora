@@ -15,10 +15,13 @@ from hostora.main import create_app
 
 
 def run() -> None:
+    import os
+    from pathlib import Path
+
     port = 18080
     origin = f"http://127.0.0.1:{port}"
     loaded = get_settings()
-    env_test_url = loaded.test_database_url
+    env_test_url = os.environ.get("LOCUST_DATABASE_URL") or loaded.test_database_url
     env_prod_url = loaded.database_url
     if env_prod_url and env_test_url:
         assert_distinct_test_db(env_prod_url, env_test_url)
@@ -46,6 +49,11 @@ def run() -> None:
 
     time.sleep(1.5)
 
+    users = os.environ.get("LOCUST_USERS", "100")
+    spawn_rate = os.environ.get("LOCUST_SPAWN_RATE", "10")
+    run_time = os.environ.get("LOCUST_RUN_TIME", "2m")
+    Path("loadtest/results").mkdir(parents=True, exist_ok=True)
+
     cmd = [
         "uv",
         "run",
@@ -56,12 +64,14 @@ def run() -> None:
         "-H",
         origin,
         "-u",
-        "10",
+        users,
         "-r",
-        "2",
+        spawn_rate,
         "-t",
-        "15s",
+        run_time,
         "--only-summary",
+        "--csv",
+        "loadtest/results/local",
     ]
     res = subprocess.run(cmd, check=False)  # noqa: S603
     server.should_exit = True

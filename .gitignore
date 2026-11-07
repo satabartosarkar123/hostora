@@ -17,6 +17,8 @@ dist/
 # Env and secrets
 .env
 .env.*
+*.env
+**/*.env
 !.env.example
 
 # Test and tool output

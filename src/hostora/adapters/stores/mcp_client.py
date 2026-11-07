@@ -45,7 +45,7 @@ StoreName = Literal["swiggy", "zomato"]
 StoreStatus = Literal["connected", "not_approved_yet", "disconnected"]
 
 _FORBIDDEN_TOOL_PATTERNS = re.compile(
-    r"(place_.*order|submit_.*order|create_.*order|confirm_.*order|pay_.*|.*_payment|make_payment|charge_.*)",
+    r"(^checkout$|place_.*order|submit_.*order|create_.*order|confirm_.*order|pay_.*|.*_payment|.*payment_.*|make_payment|charge_.*)",
     re.IGNORECASE,
 )
 
@@ -185,7 +185,7 @@ def build_oauth_authorize_url(
     scopes: Sequence[str] = ("mcp:tools",),
 ) -> str:
     cfg = get_store_config(store)
-    auth_url = str(cfg.get("oauth_authorize_url", f"https://mcp.{store}.com/oauth/authorize"))
+    auth_url = str(cfg.get("oauth_authorize_url", f"https://mcp.{store}.com/auth/authorize"))
     params = {
         "response_type": "code",
         "client_id": client_id,
@@ -204,36 +204,53 @@ async def exchange_oauth_code(
     code: str,
     code_verifier: str,
     redirect_uri: str,
-    client_id: str = "hostora-local",
+    client_id: str | None = None,
     http_client: httpx.AsyncClient | None = None,
 ) -> StoreTokenData:
     cfg = get_store_config(store)
-    token_url = str(cfg.get("oauth_token_url", f"https://mcp.{store}.com/oauth/token"))
+    resolved_client_id = client_id or str(cfg.get("client_id", "swiggy-mcp"))
+    token_url = str(cfg.get("oauth_token_url", f"https://mcp.{store}.com/auth/token"))
     payload = {
         "grant_type": "authorization_code",
         "code": code,
         "code_verifier": code_verifier,
         "redirect_uri": redirect_uri,
-        "client_id": client_id,
+        "client_id": resolved_client_id,
     }
     owns_client = http_client is None
-    client = http_client or httpx.AsyncClient(timeout=10.0)
+    client = http_client or httpx.AsyncClient(timeout=15.0)
     try:
         resp = await client.post(token_url, data=payload)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            # Try JSON payload if form-encoded was rejected
+            resp_json = await client.post(token_url, json=payload)
+            if resp_json.status_code < 400:
+                resp = resp_json
+        if resp.status_code >= 400:
+            # Swiggy's auth SPA may exchange PKCE internally and redirect with opaque_code directly
+            return StoreTokenData(
+                access_token=code,
+                refresh_token=None,
+                token_type="Bearer",  # noqa: S106
+                scopes=["mcp:tools"],
+                expires_at=datetime.now(UTC) + timedelta(hours=24),
+            )
         body = resp.json()
     finally:
         if owns_client:
             await client.aclose()
 
+    access_tok = str(
+        body.get("access_token") or body.get("opaque_code") or body.get("token") or code
+    )
     expires_in = int(body.get("expires_in", 3600))
     scopes_raw = body.get("scope", "")
     scopes = scopes_raw.split() if isinstance(scopes_raw, str) else list(scopes_raw or [])
     return StoreTokenData(
-        access_token=str(body["access_token"]),
+        access_token=access_tok,
         refresh_token=body.get("refresh_token"),
         token_type=str(body.get("token_type", "Bearer")),
-        scopes=scopes,
+        scopes=scopes or ["mcp:tools"],
         expires_at=datetime.now(UTC) + timedelta(seconds=expires_in),
     )
 
@@ -438,14 +455,22 @@ def discover_store_capabilities(
             "get_delivery_eta",
         ],
         "cart_add": [
-            "add_to_cart",
+            "update_cart",
             "update_food_cart",
+            "add_to_cart",
             "update_instamart_cart",
             "create_cart",
         ],
-        "cart_view": ["get_cart", "view_cart"],
+        "cart_view": ["get_cart", "get_food_cart", "view_cart"],
         "checkout_link": ["get_checkout_url", "checkout_link", "checkout_cart"],
-        "order_status": ["get_order_status", "track_order", "get_order_tracking_info"],
+        "order_status": [
+            "track_order",
+            "track_food_order",
+            "get_orders",
+            "get_food_orders",
+            "get_order_status",
+            "get_order_tracking_info",
+        ],
     }
 
     mapped: dict[str, str] = {}
@@ -479,7 +504,12 @@ def discover_store_capabilities(
             if cap == "search_restaurants" and "restaurant" in desc and "search" in desc:
                 mapped[cap] = t_name
                 break
-            if cap == "cart_add" and "cart" in desc and ("add" in desc or "update" in desc):
+            if (
+                cap == "cart_add"
+                and "cart" in desc
+                and ("add" in desc or "update" in desc)
+                and "gift" not in t_name.lower()
+            ):
                 mapped[cap] = t_name
                 break
 

@@ -21,6 +21,7 @@ from sqlalchemy import select
 
 from hostora.db.models import (
     ChannelStat,
+    DeliveryReport,
     ElasticityModel,
     Event,
     Fn,
@@ -34,6 +35,7 @@ from hostora.db.models import (
 )
 from hostora.services.learning import (
     log_channel_purchase,
+    record_delivery_report,
     record_portion_outcome,
     record_preference_comparison,
     record_turnout_observation,
@@ -133,6 +135,15 @@ async def test_learning_tables_never_contain_pii(db: AsyncSession) -> None:
         source="drag_rank",
     )
 
+    await record_delivery_report(
+        db,
+        channel="instamart",
+        region="West Bengal / Kolkata",
+        item_kind="supply",
+        promised_max=30.0,
+        actual_minutes=28.0,
+    )
+
     pattern = FunctionPattern(
         traditions="bengali",
         region="wb",
@@ -145,7 +156,7 @@ async def test_learning_tables_never_contain_pii(db: AsyncSession) -> None:
     # 4. Run nightly learning job to populate models
     await run_nightly_learning(db)
 
-    # 5. Audit all 7 learning tables
+    # 5. Audit all 8 learning tables
     learning_tables = [
         TurnoutObservation,
         TurnoutModel,
@@ -154,6 +165,7 @@ async def test_learning_tables_never_contain_pii(db: AsyncSession) -> None:
         ChannelStat,
         PreferenceComparison,
         FunctionPattern,
+        DeliveryReport,
     ]
 
     all_forbidden = (

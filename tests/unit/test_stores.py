@@ -28,45 +28,310 @@ from hostora.security.crypto import decrypt_store_token, encrypt_store_token
 
 RECORDED_SWIGGY_LIST_TOOLS = [
     {
-        "name": "search_products",
-        "description": "Search Swiggy Instamart catalog products at a delivery location",
+        "name": "get_addresses",
+        "description": (
+            "Swiggy (Instamart/Food): Get saved delivery addresses in recommended display order."
+        ),
         "inputSchema": {
             "type": "object",
-            "properties": {"query": {"type": "string"}, "lat": {"type": "number"}},
+            "properties": {
+                "page": {"type": "number", "default": 1},
+                "pageSize": {"type": "number", "default": 10},
+                "explicitAddressId": {"type": "string"},
+                "selectedAddressId": {"type": "string"},
+                "latitude": {"type": "number"},
+                "longitude": {"type": "number"},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "create_address",
+        "description": (
+            "Swiggy (Instamart/Food): Create a new delivery address for the authenticated user."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "fullAddress": {"type": "string"},
+                "addressLine": {"type": "string"},
+                "addressLine2": {"type": "string"},
+                "city": {"type": "string"},
+                "postalCode": {"type": "string"},
+                "addressCategory": {"type": "string"},
+                "userName": {"type": "string"},
+                "userPhone": {"type": "string"},
+            },
+            "required": [
+                "fullAddress",
+                "addressLine",
+                "addressLine2",
+                "city",
+                "postalCode",
+                "addressCategory",
+                "userName",
+                "userPhone",
+            ],
+        },
+    },
+    {
+        "name": "delete_address",
+        "description": (
+            "Swiggy (Instamart/Food): Delete a saved delivery address for the authenticated user."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"addressId": {"type": "string"}},
+            "required": ["addressId"],
+        },
+    },
+    {
+        "name": "search_products",
+        "description": (
+            "Search for products available at an address or guest coordinates. "
+            "Returns products with variants."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "addressId": {"type": "string", "minLength": 1, "maxLength": 64},
+                "latitude": {"type": "number"},
+                "longitude": {"type": "number"},
+                "query": {"type": "string", "minLength": 1, "maxLength": 256},
+                "offset": {"type": "number", "minimum": 0, "maximum": 10000},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "add_gift_pack_to_cart",
+        "description": "Add a ready-made gift box or sharing pack to the user's Instamart cart.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "intent": {"type": "string"},
+                "selectedAddressId": {"type": "string"},
+                "people": {"type": "integer"},
+                "budget": {"type": "number"},
+            },
+            "required": ["intent"],
+        },
+    },
+    {
+        "name": "your_go_to_items",
+        "description": (
+            "Fetch the user's Your Go To Items (frequently or recently ordered items) "
+            "for the selected delivery address."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"addressId": {"type": "string"}, "offset": {"type": "number"}},
+            "required": ["addressId"],
+        },
+    },
+    {
+        "name": "get_cart",
+        "description": (
+            "Swiggy Instamart (Grocery): Get current Swiggy Instamart grocery cart "
+            "with all items and bill breakdown."
+        ),
+        "inputSchema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "update_cart",
+        "description": (
+            "Swiggy Instamart (Grocery): Update grocery items in the cart. "
+            "Pass skuId, spinId, and quantity from search_products."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "selectedAddressId": {"type": "string"},
+                "latitude": {"type": "number"},
+                "longitude": {"type": "number"},
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "spinId": {"type": "string"},
+                            "skuId": {"type": "string"},
+                            "quantity": {"type": "integer", "minimum": 1},
+                        },
+                        "required": ["spinId", "quantity"],
+                    },
+                },
+            },
+            "required": ["items"],
+        },
+    },
+    {
+        "name": "clear_cart",
+        "description": "Clear (remove all items from) the Instamart cart.",
+        "inputSchema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "checkout",
+        "description": (
+            "Swiggy Instamart (Grocery): Place and confirm a Swiggy Instamart order "
+            "from the current cart (FORBIDDEN by Hostora safety rules)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "addressId": {"type": "string"},
+                "paymentMethod": {"type": "string"},
+            },
+            "required": ["addressId"],
+        },
+    },
+    {
+        "name": "get_orders",
+        "description": "Swiggy Instamart order history.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "count": {"type": "number"},
+                "orderType": {"type": "string"},
+                "activeOnly": {"type": "boolean"},
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "track_order",
+        "description": "Track Swiggy Instamart order status in real-time.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "orderId": {"type": "string"},
+                "lat": {"type": "number"},
+                "lng": {"type": "number"},
+            },
+            "required": ["orderId", "lat", "lng"],
+        },
+    },
+    {
+        "name": "get_delivery_status",
+        "description": "Internal: live delivery ETA for the order-success widget.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"orderId": {"type": "string"}, "addressId": {"type": "string"}},
+            "required": ["orderId", "addressId"],
         },
     },
     {
         "name": "search_restaurants",
-        "description": "Search Swiggy Food restaurants and dishes near venue",
+        "description": (
+            "Search and order food from restaurants for delivery. PRIMARY FOOD DELIVERY SERVICE."
+        ),
         "inputSchema": {
             "type": "object",
-            "properties": {"query": {"type": "string"}},
+            "properties": {
+                "addressId": {"type": "string"},
+                "latitude": {"type": "number"},
+                "longitude": {"type": "number"},
+                "query": {"type": "string"},
+                "offset": {"type": "number"},
+            },
+            "required": ["query"],
         },
     },
     {
-        "name": "get_menu",
-        "description": "Fetch restaurant menu items and prices",
-        "inputSchema": {"type": "object", "properties": {"restaurant_id": {"type": "string"}}},
+        "name": "search_menu",
+        "description": "Search for dishes and menu items to order for food delivery.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "addressId": {"type": "string"},
+                "latitude": {"type": "number"},
+                "longitude": {"type": "number"},
+                "query": {"type": "string"},
+                "restaurantIdOfAddedItem": {"type": "string"},
+                "vegFilter": {"type": "number"},
+            },
+            "required": ["query"],
+        },
     },
     {
-        "name": "get_addresses",
-        "description": "Get saved delivery addresses and ETA",
-        "inputSchema": {"type": "object", "properties": {}},
+        "name": "get_restaurant_menu",
+        "description": "Get the complete menu of a restaurant, paginated by category.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "addressId": {"type": "string"},
+                "restaurantId": {"type": "string"},
+                "page": {"type": "number"},
+                "pageSize": {"type": "number"},
+            },
+            "required": ["restaurantId"],
+        },
     },
     {
-        "name": "add_to_cart",
-        "description": "Add products or dishes to the user's Swiggy cart without placing order",
-        "inputSchema": {"type": "object", "properties": {"items": {"type": "array"}}},
+        "name": "get_food_cart",
+        "description": "Get current food delivery cart with all items.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"addressId": {"type": "string"}, "restaurantName": {"type": "string"}},
+            "required": ["addressId"],
+        },
     },
     {
-        "name": "get_cart",
-        "description": "View current Swiggy cart",
-        "inputSchema": {"type": "object", "properties": {}},
+        "name": "update_food_cart",
+        "description": "Add items to food delivery cart or update cart contents.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "restaurantId": {"type": "string"},
+                "cartItems": {"type": "array"},
+                "addressId": {"type": "string"},
+            },
+            "required": ["restaurantId", "cartItems"],
+        },
+    },
+    {
+        "name": "flush_food_cart",
+        "description": "Clear or empty the food delivery cart.",
+        "inputSchema": {"type": "object", "properties": {}, "required": []},
     },
     {
         "name": "place_food_order",
-        "description": "Place a food order (FORBIDDEN by Hostora safety rules)",
-        "inputSchema": {"type": "object", "properties": {}},
+        "description": (
+            "Place food delivery order and confirm order placement "
+            "(FORBIDDEN by Hostora safety rules)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"addressId": {"type": "string"}, "paymentMethod": {"type": "string"}},
+            "required": ["addressId"],
+        },
+    },
+    {
+        "name": "get_payment_options",
+        "description": (
+            "Fetch live payment options for the current cart (FORBIDDEN by Hostora safety rules)."
+        ),
+        "inputSchema": {"type": "object", "properties": {"addressId": {"type": "string"}}},
+    },
+    {
+        "name": "check_payment_status",
+        "description": (
+            "Check status of an in-flight UPI payment (FORBIDDEN by Hostora safety rules)."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {"paasId": {"type": "string"}},
+            "required": ["paasId"],
+        },
+    },
+    {
+        "name": "confirm_order",
+        "description": "Confirm a UPI order after payment (FORBIDDEN by Hostora safety rules).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {"orderId": {"type": "string"}},
+            "required": ["orderId"],
+        },
     },
 ]
 
@@ -151,12 +416,20 @@ def test_tool_capability_mapping_from_recorded_fixtures() -> None:
     )
     assert swiggy_map["search_products"] == "search_products"
     assert swiggy_map["search_restaurants"] == "search_restaurants"
-    assert swiggy_map["get_menu"] == "get_menu"
+    assert swiggy_map["get_menu"] == "get_restaurant_menu"
     assert swiggy_map["eta"] == "get_addresses"
-    assert swiggy_map["cart_add"] == "add_to_cart"
+    assert swiggy_map["cart_add"] == "update_cart"
     assert swiggy_map["cart_view"] == "get_cart"
-    # Forbidden tool is never mapped to any capability
-    assert "place_food_order" not in swiggy_map.values()
+    assert swiggy_map["order_status"] == "track_order"
+    # Forbidden tools are never mapped to any capability
+    for forbidden in (
+        "checkout",
+        "place_food_order",
+        "confirm_order",
+        "check_payment_status",
+        "get_payment_options",
+    ):
+        assert forbidden not in swiggy_map.values()
 
     zomato_map = discover_store_capabilities(
         "zomato",
@@ -171,7 +444,11 @@ def test_tool_capability_mapping_from_recorded_fixtures() -> None:
 
 
 def test_contract_fails_loudly_when_tool_missing_or_schema_invalid() -> None:
-    incomplete_tools = [t for t in RECORDED_SWIGGY_LIST_TOOLS if t["name"] != "add_to_cart"]
+    incomplete_tools = [
+        t
+        for t in RECORDED_SWIGGY_LIST_TOOLS
+        if t["name"] not in ("update_cart", "update_food_cart", "add_to_cart")
+    ]
     with pytest.raises(StoreContractError, match="missing required capability 'cart_add'"):
         discover_store_capabilities(
             "swiggy",

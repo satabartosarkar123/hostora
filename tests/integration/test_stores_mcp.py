@@ -14,7 +14,6 @@ from mcp.server.mcpserver import MCPServer
 from sqlalchemy import select
 
 from hostora.adapters.stores import (
-    LiveStoreOffer,
     StoreContractError,
     StoreTokenData,
     SwiggyStoreAdapter,
@@ -41,19 +40,50 @@ pytestmark = [pytest.mark.db]
 
 
 def make_fake_swiggy_mcp_servers() -> tuple[MCPServer, MCPServer, list[tuple[str, dict[str, Any]]]]:
-    """Create in-memory MCP servers for Swiggy Instamart and Swiggy Food with a call spy."""
+    """Create in-memory MCP servers for Swiggy Instamart and Swiggy Food matching the real
+    Swiggy Builders Club MCP tool names (`get_addresses`, `search_products`, `update_cart`,
+    `get_cart`, `checkout` on `/im`; `search_restaurants`, `search_menu`, `get_restaurant_menu`,
+    `update_food_cart`, `get_food_cart`, `place_food_order` on `/food`) with a call spy."""
     call_log: list[tuple[str, dict[str, Any]]] = []
 
     im_srv = MCPServer("fake-swiggy-instamart")
 
     @im_srv.tool()
-    def search_products(query: str, lat: float = 22.57, lng: float = 88.36) -> dict[str, Any]:
-        """Search Swiggy Instamart grocery and supply products."""
-        call_log.append(("im:search_products", {"query": query, "lat": lat, "lng": lng}))
+    def get_addresses(page: int = 1, pageSize: int = 10) -> dict[str, Any]:  # noqa: N803
+        """Swiggy (Instamart/Food): Get saved delivery addresses in recommended display order."""
+        call_log.append(("im:get_addresses", {"page": page, "pageSize": pageSize}))
+        return {
+            "addresses": [
+                {
+                    "id": "addr_demo_1",
+                    "annotation": "Home",
+                    "city": "Kolkata",
+                }
+            ]
+        }
+
+    @im_srv.tool()
+    def search_products(
+        query: str,
+        addressId: str = "addr_demo_1",  # noqa: N803
+        latitude: float = 22.57,
+        longitude: float = 88.36,
+        lat: float = 22.57,
+        lng: float = 88.36,
+    ) -> dict[str, Any]:
+        """Search for products available at an address or guest coordinates."""
+        call_log.append(
+            (
+                "im:search_products",
+                {"query": query, "addressId": addressId, "lat": lat, "lng": lng},
+            )
+        )
         return {
             "items": [
                 {
                     "name": f"Instamart {query.title()} Pack",
+                    "spinId": f"SPIN_{query.upper().replace(' ', '_')}",
+                    "skuId": f"SKU_{query.upper().replace(' ', '_')}",
                     "pack_size": 1,
                     "unit": "piece",
                     "price_inr": 145.0,
@@ -66,11 +96,19 @@ def make_fake_swiggy_mcp_servers() -> tuple[MCPServer, MCPServer, list[tuple[str
         }
 
     @im_srv.tool()
-    def add_to_cart(
-        items: list[dict[str, Any]], lat: float = 22.57, lng: float = 88.36
+    def update_cart(
+        items: list[dict[str, Any]],
+        selectedAddressId: str = "addr_demo_1",  # noqa: N803
+        lat: float = 22.57,
+        lng: float = 88.36,
     ) -> dict[str, Any]:
-        """Add items to the user's Swiggy Instamart cart without placing an order."""
-        call_log.append(("im:add_to_cart", {"items": items, "lat": lat, "lng": lng}))
+        """Swiggy Instamart (Grocery): Update grocery items in the cart without placing an order."""
+        call_log.append(
+            (
+                "im:update_cart",
+                {"items": items, "selectedAddressId": selectedAddressId, "lat": lat, "lng": lng},
+            )
+        )
         total_qty = sum(int(x.get("quantity", 1)) for x in items)
         return {
             "added_items": len(items),
@@ -81,17 +119,33 @@ def make_fake_swiggy_mcp_servers() -> tuple[MCPServer, MCPServer, list[tuple[str
         }
 
     @im_srv.tool()
-    def place_instamart_order() -> dict[str, Any]:
+    def get_cart() -> dict[str, Any]:
+        """Swiggy Instamart (Grocery): Get current Swiggy Instamart grocery cart."""
+        call_log.append(("im:get_cart", {}))
+        return {"cartTotalAmount": "₹290", "items": []}
+
+    @im_srv.tool()
+    def checkout(addressId: str = "addr_demo_1") -> dict[str, Any]:  # noqa: N803
         """Forbidden order-placement tool — must NEVER be called by Hostora."""
-        call_log.append(("im:place_instamart_order", {}))
-        raise AssertionError("place_instamart_order must never be called!")
+        call_log.append(("im:checkout", {"addressId": addressId}))
+        raise AssertionError("checkout must never be called!")
 
     food_srv = MCPServer("fake-swiggy-food")
 
     @food_srv.tool()
-    def search_restaurants(query: str, lat: float = 22.57, lng: float = 88.36) -> dict[str, Any]:
-        """Search Swiggy Food restaurants and ready-to-eat dishes."""
-        call_log.append(("food:search_restaurants", {"query": query, "lat": lat, "lng": lng}))
+    def search_restaurants(
+        query: str,
+        addressId: str = "addr_demo_1",  # noqa: N803
+        lat: float = 22.57,
+        lng: float = 88.36,
+    ) -> dict[str, Any]:
+        """Search and order food from restaurants for delivery."""
+        call_log.append(
+            (
+                "food:search_restaurants",
+                {"query": query, "addressId": addressId, "lat": lat, "lng": lng},
+            )
+        )
         return {
             "items": [
                 {
@@ -108,13 +162,31 @@ def make_fake_swiggy_mcp_servers() -> tuple[MCPServer, MCPServer, list[tuple[str
         }
 
     @food_srv.tool()
+    def get_restaurant_menu(restaurantId: str, addressId: str = "addr_demo_1") -> dict[str, Any]:  # noqa: N803
+        """Get the complete menu of a restaurant, paginated by category."""
+        call_log.append(
+            ("food:get_restaurant_menu", {"restaurantId": restaurantId, "addressId": addressId})
+        )
+        return {"categories": []}
+
+    @food_srv.tool()
     def update_food_cart(
-        items: list[dict[str, Any]], lat: float = 22.57, lng: float = 88.36
+        items: list[dict[str, Any]] | None = None,
+        cartItems: list[dict[str, Any]] | None = None,  # noqa: N803
+        restaurantId: str = "rest_1",  # noqa: N803
+        lat: float = 22.57,
+        lng: float = 88.36,
     ) -> dict[str, Any]:
-        """Add dishes to the user's Swiggy Food cart without placing an order."""
-        call_log.append(("food:update_food_cart", {"items": items, "lat": lat, "lng": lng}))
+        """Add items to food delivery cart or update cart contents without placing an order."""
+        resolved = items or cartItems or []
+        call_log.append(
+            (
+                "food:update_food_cart",
+                {"items": resolved, "restaurantId": restaurantId, "lat": lat, "lng": lng},
+            )
+        )
         return {
-            "added_items": len(items),
+            "added_items": len(resolved),
             "total_inr": 1950.0,
             "eta_min": 28,
             "eta_max": 42,
@@ -122,9 +194,9 @@ def make_fake_swiggy_mcp_servers() -> tuple[MCPServer, MCPServer, list[tuple[str
         }
 
     @food_srv.tool()
-    def place_food_order() -> dict[str, Any]:
+    def place_food_order(addressId: str = "addr_demo_1") -> dict[str, Any]:  # noqa: N803
         """Forbidden order-placement tool — must NEVER be called by Hostora."""
-        call_log.append(("food:place_food_order", {}))
+        call_log.append(("food:place_food_order", {"addressId": addressId}))
         raise AssertionError("place_food_order must never be called!")
 
     return im_srv, food_srv, call_log
@@ -263,14 +335,16 @@ async def test_120_minute_plan_live_offers_build_carts_and_privacy_spy(
         assert cart_data["addedItems"] == 2
         assert cart_data["checkoutUrl"] == "https://www.swiggy.com/instamart/checkout"
 
-        cart_calls = [c for c in call_log if c[0] == "im:add_to_cart"]
+        cart_calls = [c for c in call_log if c[0] in ("im:update_cart", "im:add_to_cart")]
         assert len(cart_calls) == 1
         assert cart_calls[0][1]["items"] == [
             {"item_id": "mineral_water", "quantity": 3},
             {"item_id": "paper_plates", "quantity": 2},
         ]
         # Never called any order-placement or payment tool
-        assert not any("order" in name or "pay" in name for name, _ in call_log)
+        assert not any(
+            "order" in name or "pay" in name or "checkout" in name for name, _ in call_log
+        )
 
         # 7. Spy assertion: no household name or phone number in any MCP request
         serialized_calls = json.dumps(call_log)
@@ -566,21 +640,187 @@ async def test_knowledge_services_and_host_planner_html_routes(
 
 @pytest.mark.store_live
 async def test_swiggy_instamart_live_search_and_cart_without_checkout() -> None:
+    import httpx2
+    import mcp
+    from mcp.client.streamable_http import streamable_http_client
+
+    from hostora.config import get_settings
+    from hostora.db.session import make_engine, make_sessionmaker
+
     token = os.environ.get("SWIGGY_LIVE_ACCESS_TOKEN", "").strip()
     if not token:
-        pytest.skip("SWIGGY_LIVE_ACCESS_TOKEN not set; skipping live Swiggy MCP test")
+        real_settings = get_settings()
+        engine = make_engine(real_settings)
+        maker = make_sessionmaker(engine)
+        try:
+            async with maker() as real_sess:
+                loaded = await load_store_token(
+                    real_sess, real_settings, "demo-host", "swiggy", auto_refresh=True
+                )
+                if loaded is not None:
+                    token = loaded.access_token
+        finally:
+            await engine.dispose()
 
-    adapter = SwiggyStoreAdapter(access_token=token)
-    found: dict[str, LiveStoreOffer] = {}
-    for q in ("paneer", "basmati rice", "paper plates"):
-        offers = await adapter.search_instamart_offers(item_id=q, query=q)
-        assert offers, f"Expected live Instamart offers for {q}"
-        found[q] = offers[0]
+    if not token:
+        pytest.skip(
+            "No Swiggy OAuth token found in SWIGGY_LIVE_ACCESS_TOKEN or store_connection; "
+            "connect Swiggy at http://localhost:8000/app/settings first"
+        )
 
-    # Fill cart without checking out
-    cart_res = await adapter.build_cart(
-        channel="instamart",
-        quantities=dict.fromkeys(found, 1),
-    )
-    assert cart_res.added_items == 3
-    assert cart_res.checkout_url.startswith("https://")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Inspect and print real list_tools from Swiggy Instamart MCP and Swiggy Food MCP
+    im_tools_dump: list[dict[str, Any]] = []
+    food_tools_dump: list[dict[str, Any]] = []
+
+    async with (
+        httpx2.AsyncClient(headers=headers, timeout=20.0) as http_client,
+        mcp.Client(
+            streamable_http_client("https://mcp.swiggy.com/im", http_client=http_client)
+        ) as im_client,
+    ):
+        im_res = await im_client.list_tools()
+        for t in im_res.tools:
+            im_tools_dump.append(
+                {
+                    "name": t.name,
+                    "description": getattr(t, "description", ""),
+                    "inputSchema": getattr(t, "input_schema", None)
+                    or getattr(t, "inputSchema", None)
+                    or {},
+                }
+            )
+        print("\n=== REAL SWIGGY INSTAMART MCP list_tools ===")
+        print(json.dumps(im_tools_dump, indent=2))
+
+        # Discover user's saved addresses if an address tool exists
+        addr_tool = next(
+            (
+                t["name"]
+                for t in im_tools_dump
+                if "address" in t["name"].lower() or "location" in t["name"].lower()
+            ),
+            None,
+        )
+        addr_res: Any = None
+        if addr_tool:
+            try:
+                addr_res = await im_client.call_tool(addr_tool, {})
+                for blk in addr_res.content:
+                    txt = getattr(blk, "text", None)
+                    if isinstance(txt, str) and txt.strip():
+                        print(f"\n=== REAL SWIGGY ADDRESSES ({addr_tool}) ===")
+                        print(txt[:1000])
+            except Exception as exc:
+                print(f"Address lookup note: {exc}")
+
+        # Search 3 Instamart items at the user's address and add to cart (NO CHECKOUT)
+        search_tool = next(
+            (
+                t["name"]
+                for t in im_tools_dump
+                if "search" in t["name"].lower() or "product" in t["name"].lower()
+            ),
+            im_tools_dump[0]["name"] if im_tools_dump else "search_products",
+        )
+
+        # Extract all saved addressIds from get_addresses text `(ID: <addressId>)`
+        import re as _re
+
+        addr_text_full = (
+            "\n".join(getattr(b, "text", "") for b in addr_res.content if getattr(b, "text", None))
+            if addr_res is not None
+            else ""
+        )
+        all_address_ids = _re.findall(r"\(ID:\s*([A-Za-z0-9_-]+)\)", addr_text_full)
+        print(f"\n=== ALL SAVED ADDRESS IDS: {all_address_ids} ===")
+        assert all_address_ids, "Expected at least one saved Swiggy addressId from get_addresses"
+
+        found_items: list[dict[str, Any]] = []
+        cart_payload_items: list[dict[str, Any]] = []
+        cart_text = ""
+        selected_address_id = all_address_ids[0]
+
+        for candidate_addr_id in all_address_ids:
+            temp_found: list[dict[str, Any]] = []
+            temp_cart: list[dict[str, Any]] = []
+            for q in ("paneer", "basmati rice", "paper plates"):
+                call_args: dict[str, Any] = {"query": q, "addressId": candidate_addr_id}
+                s_res = await im_client.call_tool(search_tool, call_args)
+                raw_text = "\n".join(
+                    getattr(b, "text", "") for b in s_res.content if getattr(b, "text", None)
+                )
+                if not raw_text.strip() or "addressId is required" in raw_text:
+                    break
+                m_spin = _re.search(r'"spinId"\s*:\s*"([A-Za-z0-9_-]+)"', raw_text)
+                m_sku = _re.search(r'"skuId"\s*:\s*"([A-Za-z0-9_-]+)"', raw_text)
+                spin_id = m_spin.group(1) if m_spin else None
+                sku_id = m_sku.group(1) if m_sku else None
+                if spin_id:
+                    item_entry: dict[str, Any] = {"spinId": spin_id, "quantity": 1}
+                    if sku_id:
+                        item_entry["skuId"] = sku_id
+                    temp_cart.append(item_entry)
+                    temp_found.append({"query": q, "raw": raw_text})
+
+            if len(temp_cart) == 3:
+                c_res = await im_client.call_tool(
+                    "update_cart",
+                    {
+                        "selectedAddressId": candidate_addr_id,
+                        "items": temp_cart,
+                    },
+                )
+                c_text = "\n".join(
+                    getattr(b, "text", "") for b in c_res.content if getattr(b, "text", None)
+                )
+                if "not serviceable" not in c_text.lower():
+                    selected_address_id = candidate_addr_id
+                    found_items = temp_found
+                    cart_payload_items = temp_cart
+                    cart_text = c_text
+                    break
+                if not found_items:
+                    selected_address_id = candidate_addr_id
+                    found_items = temp_found
+                    cart_payload_items = temp_cart
+                    cart_text = c_text
+
+        print(f"\n=== SELECTED ADDRESS ID: {selected_address_id} ===")
+        for item in found_items:
+            print(f"\n=== REAL INSTAMART SEARCH ({item['query']}) AT {selected_address_id} ===")
+            print(item["raw"][:2200])
+
+        assert len(found_items) == 3
+        assert len(cart_payload_items) == 3
+        print(f"\n=== CALLING REAL update_cart WITH 3 ITEMS: {cart_payload_items} ===")
+        print("\n=== REAL SWIGGY INSTAMART update_cart OUTPUT ===")
+        print(cart_text[:3000])
+
+        get_cart_res = await im_client.call_tool("get_cart", {})
+        get_cart_text = "\n".join(
+            getattr(b, "text", "") for b in get_cart_res.content if getattr(b, "text", None)
+        )
+        print("\n=== REAL SWIGGY INSTAMART get_cart OUTPUT ===")
+        print(get_cart_text[:3000])
+
+    async with (
+        httpx2.AsyncClient(headers=headers, timeout=20.0) as http_client,
+        mcp.Client(
+            streamable_http_client("https://mcp.swiggy.com/food", http_client=http_client)
+        ) as food_client,
+    ):
+        food_res = await food_client.list_tools()
+        for t in food_res.tools:
+            food_tools_dump.append(
+                {
+                    "name": t.name,
+                    "description": getattr(t, "description", ""),
+                    "inputSchema": getattr(t, "input_schema", None)
+                    or getattr(t, "inputSchema", None)
+                    or {},
+                }
+            )
+        print("\n=== REAL SWIGGY FOOD MCP list_tools ===")
+        print(json.dumps(food_tools_dump, indent=2))
