@@ -12,6 +12,93 @@
   <h1>Account Settings</h1>
   <p class="muted">Signed in as <strong>{{ host.name or host.uid }}</strong> ({{ host.uid }})</p>
 
+  <h2>Connected Stores (Real-Time Ordering)</h2>
+  <p class="muted">
+    Connect your own Swiggy or Zomato account via official MCP OAuth 2.1 + PKCE so Hostora can check live prices, ETAs, and fill carts without ever placing an order or taking payment.
+  </p>
+
+  {% if store_notice %}
+  <div class="alert {% if 'not_approved' in store_notice %}alert--warn{% else %}alert--success{% endif %}" role="status" aria-live="polite" id="store-notice">
+    {% if store_notice == 'zomato_not_approved' %}
+      Zomato MCP is not approved yet (OAuth redirect allowlisting pending). The planner automatically falls back to feasible Zomato search links.
+    {% elif store_notice == 'swiggy_not_approved' %}
+      Swiggy Builders Club production access is not approved yet. The planner automatically falls back to feasible Swiggy search links.
+    {% elif store_notice == 'swiggy_connected' %}
+      Swiggy account connected (OAuth token encrypted with AES-GCM).
+    {% elif store_notice == 'zomato_connected' %}
+      Zomato account connected (OAuth token encrypted with AES-GCM).
+    {% elif store_notice == 'swiggy_disconnected' %}
+      Swiggy account disconnected and token deleted.
+    {% elif store_notice == 'zomato_disconnected' %}
+      Zomato account disconnected and token deleted.
+    {% else %}
+      {{ store_notice }}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="grid-2" style="margin-bottom:1.5rem;" id="store-connections-grid">
+    <!-- Swiggy Card -->
+    <div class="card" id="store-card-swiggy" style="margin-bottom:0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+        <strong>Swiggy (Instamart &amp; Food)</strong>
+        {% if swiggy_status == 'connected' %}
+          <span class="badge badge--success" id="swiggy-status-badge">connected</span>
+        {% elif swiggy_status == 'not_approved_yet' %}
+          <span class="badge badge--warn" id="swiggy-status-badge">not approved yet</span>
+        {% else %}
+          <span class="badge" id="swiggy-status-badge">disconnected</span>
+        {% endif %}
+      </div>
+      <p class="muted" style="font-size:0.88rem; margin:0.5rem 0;">
+        Swiggy Builders Club MCP (<code>mcp.swiggy.com/im</code> &amp; <code>/food</code>). Fills your cart and hands off to Swiggy checkout.
+      </p>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+        {% if swiggy_status == 'connected' %}
+        <form method="post" action="/app/settings/stores/swiggy/disconnect">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn btn--secondary" id="disconnect-swiggy-btn">Disconnect</button>
+        </form>
+        {% else %}
+        <form method="post" action="/app/settings/stores/swiggy/connect">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn" id="connect-swiggy-btn">Connect Swiggy</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Zomato Card -->
+    <div class="card" id="store-card-zomato" style="margin-bottom:0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem;">
+        <strong>Zomato</strong>
+        {% if zomato_status == 'connected' %}
+          <span class="badge badge--success" id="zomato-status-badge">connected</span>
+        {% elif zomato_status == 'not_approved_yet' %}
+          <span class="badge badge--warn" id="zomato-status-badge">not approved yet</span>
+        {% else %}
+          <span class="badge" id="zomato-status-badge">disconnected</span>
+        {% endif %}
+      </div>
+      <p class="muted" style="font-size:0.88rem; margin:0.5rem 0;">
+        Official Zomato MCP (<code>mcp-server.zomato.com/mcp</code>). Uses search links until OAuth redirect allowlisting is granted.
+      </p>
+      <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.75rem;">
+        {% if zomato_status == 'connected' %}
+        <form method="post" action="/app/settings/stores/zomato/disconnect">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn btn--secondary" id="disconnect-zomato-btn">Disconnect</button>
+        </form>
+        {% else %}
+        <form method="post" action="/app/settings/stores/zomato/connect">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn btn--secondary" id="connect-zomato-btn">Connect Zomato</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
   <h2>Language</h2>
   <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem;">
     <a class="btn {% if lang == 'en' %}btn{% else %}btn--secondary{% endif %}" href="/app/settings?lang=en">English</a>
@@ -26,7 +113,7 @@
 
   <h2>Delete Account</h2>
   <p class="muted">
-    Deleting your account immediately deletes all your events, households, invitations, replies, and gate passes.
+    Deleting your account immediately deletes all your events, households, invitations, replies, gate passes, and connected store tokens.
   </p>
   {% if error_message %}
   <div class="alert alert--error" role="alert" aria-live="polite">{{ error_message }}</div>

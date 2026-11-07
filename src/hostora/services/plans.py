@@ -7,6 +7,12 @@ from uuid import uuid4
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from hostora.adapters.commerce import format_arrival_clock
+from hostora.adapters.stores import (
+    SwiggyStoreAdapter,
+    ZomatoStoreAdapter,
+    load_store_token,
+)
 from hostora.data.loader import get_data
 from hostora.db.models import (
     Event,
@@ -21,12 +27,20 @@ from hostora.db.models import PlanModel as PlanRow
 from hostora.engine.codes import random_key
 from hostora.errors import ProblemError
 from hostora.planner.redact import redact_brief
-from hostora.schemas.plan import Plan, PlanItem, PlanRequest, RemovedItem
+from hostora.schemas.plan import (
+    DeliveryReportRequest,
+    Plan,
+    PlanItem,
+    PlanRequest,
+    RemovedItem,
+)
 from hostora.security.session import require_event_access
+from hostora.services.learning import record_delivery_report
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from hostora.config import Settings
     from hostora.security.firebase import HostIdentity
 
 
@@ -60,7 +74,7 @@ async def create_plan_run(
             id=plan_id,
             function_id=body.function_id,
             status="running",
-            request={"brief": redacted, "days_left": body.days_left},
+            request={"brief": redacted, "minutes_left": body.minutes_left},
             body=None,
             route="groq",
             data_version=get_data().version,
@@ -366,3 +380,171 @@ async def get_latest_plan_for_function(
             await session.scalars(select(Purchase).where(Purchase.plan_id == row.id))
         ).all()
         return Plan.model_validate(row.body), {p.item_id: p for p in purchases}
+
+
+async def build_store_cart_for_plan(
+    session: AsyncSession,
+    settings: Settings,
+    plan_id: str,
+    host: HostIdentity,
+    *,
+    channel: str,
+    quantities: dict[str, int] | None = None,
+    instamart_server_override: Any = None,
+    food_server_override: Any = None,
+    zomato_server_override: Any = None,
+    refresh_fn: Any = None,
+) -> dict[str, Any]:
+    """Fill the host's connected store cart for ``channel`` and return checkout handoff URL."""
+    now = datetime.now(UTC)
+    async with session.begin():
+        row, fn = await verify_plan_access(session, plan_id, host, need="edit")
+        if row.body is None:
+            raise ProblemError(404, "Plan not found")
+        plan_obj = Plan.model_validate(row.body)
+        evt = await session.get(Event, fn.event_key)
+        lat = evt.venue_lat if evt else 22.5726
+        lng = evt.venue_lng if evt else 88.3639
+
+        hh_names = list(
+            (
+                await session.scalars(
+                    select(Household.display_name).where(Household.event_key == fn.event_key)
+                )
+            ).all()
+        )
+
+        store_name = "zomato" if channel == "zomato" else "swiggy"
+        if channel not in ("instamart", "swiggy_food", "zomato"):
+            raise ProblemError(
+                422,
+                f"Channel '{channel}' does not support connected cart building; use search links",
+                field="channel",
+            )
+
+        token_data = await load_store_token(
+            session,
+            settings,
+            host.uid,
+            store_name,
+            auto_refresh=True,
+            refresh_fn=refresh_fn,
+        )
+        if token_data is None:
+            raise ProblemError(
+                422,
+                f"Store '{store_name}' is not connected. Connect your account in Settings first.",
+                field="channel",
+            )
+
+        eff_quantities: dict[str, int] = dict(quantities or {})
+        if not eff_quantities:
+            matched_cart = next((c for c in plan_obj.cart_plan.carts if c.channel == channel), None)
+            if matched_cart:
+                for iid in matched_cart.item_ids:
+                    it = next((x for x in plan_obj.items if x.item_id == iid), None)
+                    pack_cnt = sum(pk.count for pk in it.packs) if (it and it.packs) else 1
+                    eff_quantities[iid] = max(1, pack_cnt)
+            else:
+                for it in plan_obj.items:
+                    if any(o.channel == channel for o in it.offers):
+                        pack_cnt = sum(pk.count for pk in it.packs) if it.packs else 1
+                        eff_quantities[it.item_id] = max(1, pack_cnt)
+
+        if store_name == "swiggy":
+            adapter = SwiggyStoreAdapter(
+                access_token=token_data.access_token,
+                instamart_server_override=instamart_server_override,
+                food_server_override=food_server_override,
+                forbidden_terms=hh_names,
+            )
+            res = await adapter.build_cart(
+                channel=channel,
+                quantities=eff_quantities,
+                lat=lat,
+                lng=lng,
+            )
+        else:
+            z_adapter = ZomatoStoreAdapter(
+                access_token=token_data.access_token,
+                server_override=zomato_server_override,
+                forbidden_terms=hh_names,
+            )
+            res = await z_adapter.build_cart(
+                quantities=eff_quantities,
+                lat=lat,
+                lng=lng,
+            )
+
+        session.add(
+            EventLog(
+                event_key=fn.event_key,
+                kind="plan.cart_built",
+                payload={
+                    "plan_id": plan_id,
+                    "store": res.store,
+                    "channel": res.channel,
+                    "added_items": res.added_items,
+                },
+                created_at=now,
+            )
+        )
+
+    return {
+        "store": res.store,
+        "channel": res.channel,
+        "addedItems": res.added_items,
+        "totalInr": res.total_inr,
+        "etaMinMinutes": res.eta_min_minutes,
+        "etaMaxMinutes": res.eta_max_minutes,
+        "arrivesBy": format_arrival_clock(res.eta_max_minutes, now),
+        "checkoutUrl": res.checkout_url,
+    }
+
+
+async def report_plan_delivery(
+    session: AsyncSession,
+    plan_id: str,
+    host: HostIdentity,
+    body: DeliveryReportRequest,
+) -> dict[str, Any]:
+    """Record a 'When did it arrive?' delivery report for a plan's store order."""
+    async with session.begin():
+        _row, fn = await verify_plan_access(session, plan_id, host, need="edit")
+        evt = await session.get(Event, fn.event_key)
+        region = (
+            "West Bengal / Kolkata"
+            if (evt and evt.pincode and evt.pincode.startswith("7"))
+            else (
+                "Tamil Nadu / Chennai"
+                if (evt and evt.pincode and evt.pincode.startswith("6"))
+                else "India"
+            )
+        )
+        rep = await record_delivery_report(
+            session,
+            channel=body.channel,
+            region=region,
+            item_kind=body.item_kind,
+            promised_max=body.promised_max,
+            actual_minutes=body.actual_minutes,
+        )
+        session.add(
+            EventLog(
+                event_key=fn.event_key,
+                kind="delivery.reported",
+                payload={
+                    "plan_id": plan_id,
+                    "channel": rep.channel,
+                    "promised_max": rep.promised_max,
+                    "actual_minutes": rep.actual_minutes,
+                },
+                created_at=datetime.now(UTC),
+            )
+        )
+    return {
+        "channel": body.channel,
+        "region": region,
+        "promisedMax": body.promised_max,
+        "actualMinutes": body.actual_minutes,
+    }

@@ -25,6 +25,7 @@ from hostora.data.loader import get_data, get_tuning_value
 from hostora.db.models import (
     ChannelHealth,
     ChannelStat,
+    DeliveryReport,
     ElasticityModel,
     EventLog,
     EventRule,
@@ -39,13 +40,14 @@ from hostora.db.models import (
     TurnoutObservation,
 )
 from hostora.engine import prediction
-from hostora.engine.bandit import ArmStats, days_band, rank_arms
+from hostora.engine.bandit import ArmStats, minutes_band, rank_arms
 from hostora.engine.bayes import (
     Obs,
     learn_elasticity,
     lognormal_posterior,
     outcome_to_obs,
 )
+from hostora.engine.delivery import Eta, learned_eta
 from hostora.engine.newsvendor import critical_ratio, order_quantity
 from hostora.engine.preferences import BudgetChoice, Variant, bradley_terry, optimize_budget
 from hostora.engine.turnout import (
@@ -609,13 +611,13 @@ async def rank_channels_for_context(
     *,
     state: str,
     item_kind: str,
-    days_left: int,
+    minutes_left: int = 10080,
     available_channels: Sequence[str],
     seed: int | None = None,
 ) -> tuple[list[str], str]:
     """Rank commerce channels using Thompson sampling with shrinkage to global stats."""
-    edges = (1.0, 3.0, 7.0)
-    band = days_band(days_left, edges)
+    edges = (1440.0, 4320.0, 10080.0)
+    band = minutes_band(minutes_left, edges)
     context_key = f"{state.lower()}:{item_kind.lower()}:{band}"
 
     # Load stats
@@ -661,6 +663,107 @@ async def rank_channels_for_context(
         else "Thompson sampling prior with global shrinkage (exploring)"
     )
     return active_ranked, basis
+
+
+async def record_delivery_report(
+    session: AsyncSession,
+    *,
+    channel: str,
+    region: str,
+    item_kind: str,
+    promised_max: float,
+    actual_minutes: float,
+) -> DeliveryReport:
+    """Record a host-reported delivery time ('When did it arrive?') into delivery_report."""
+    report = DeliveryReport(
+        channel=channel.strip().lower(),
+        region=region.strip() or "India",
+        item_kind=item_kind.strip().lower() or "food",
+        promised_max=max(0.0, float(promised_max)),
+        actual_minutes=max(0.0, float(actual_minutes)),
+        reported_at=dt.datetime.now(dt.UTC),
+    )
+    session.add(report)
+    await session.flush()
+    return report
+
+
+async def get_learned_channel_etas(
+    session: AsyncSession,
+    region: str = "India",
+) -> dict[str, Eta]:
+    """Compute ``engine.delivery.learned_eta`` per channel from reported delivery times."""
+    data = get_data()
+    stmt = select(DeliveryReport)
+    rows = (await session.execute(stmt)).scalars().all()
+    by_channel_region: dict[str, list[float]] = defaultdict(list)
+    by_channel_all: dict[str, list[float]] = defaultdict(list)
+    norm_region = region.strip().lower()
+    for r in rows:
+        by_channel_all[r.channel].append(r.actual_minutes)
+        if r.region.strip().lower() == norm_region:
+            by_channel_region[r.channel].append(r.actual_minutes)
+
+    out: dict[str, Eta] = {}
+    for ch_id, ch in data.channels.items():
+        declared = Eta(
+            min_minutes=float(ch.eta_minutes[0]),
+            max_minutes=float(ch.eta_minutes[1]),
+            source="declared",
+        )
+        reports = by_channel_region.get(ch_id) or by_channel_all.get(ch_id) or []
+        out[ch_id] = learned_eta(declared, reports)
+    return out
+
+
+async def get_effective_delivery_safety_minutes(session: AsyncSession) -> float:
+    """Return learned ``delivery_safety_minutes`` from ``tuning_value`` or cold-start prior."""
+    row = (
+        await session.execute(
+            select(TuningValue).where(TuningValue.name == "delivery_safety_minutes")
+        )
+    ).scalar_one_or_none()
+    if row is not None:
+        return float(row.value)
+    return float(get_tuning_value("delivery_safety_minutes", 30.0))
+
+
+async def update_delivery_safety_margin(session: AsyncSession) -> float:
+    """Learn ``delivery_safety_minutes`` upward when hosts report late deliveries."""
+    prior_safety = float(get_tuning_value("delivery_safety_minutes", 30.0))
+    rows = (await session.execute(select(DeliveryReport))).scalars().all()
+    late_excesses = sorted(
+        r.actual_minutes - r.promised_max for r in rows if r.actual_minutes > r.promised_max
+    )
+    existing = (
+        await session.execute(
+            select(TuningValue).where(TuningValue.name == "delivery_safety_minutes")
+        )
+    ).scalar_one_or_none()
+    current_val = float(existing.value) if existing is not None else prior_safety
+
+    if late_excesses:
+        p90_late = late_excesses[min(len(late_excesses) - 1, int(0.9 * len(late_excesses)))]
+        learned_val = max(current_val, prior_safety + p90_late)
+    else:
+        learned_val = current_val
+
+    now = dt.datetime.now(dt.UTC)
+    if existing is not None:
+        existing.value = round(learned_val, 2)
+        existing.n = len(rows)
+        existing.updated_at = now
+    else:
+        session.add(
+            TuningValue(
+                name="delivery_safety_minutes",
+                value=round(learned_val, 2),
+                n=len(rows),
+                updated_at=now,
+            )
+        )
+    await session.flush()
+    return round(learned_val, 2)
 
 
 async def search_nearby_vendors(
@@ -1021,7 +1124,10 @@ async def run_nightly_learning(session: AsyncSession) -> dict[str, Any]:
     # 4. Reply buckets
     p25, p50, p75 = await recompute_reply_buckets(session)
 
-    # 5. Drift monitoring
+    # 5. Delivery safety margin learning
+    safety_minutes = await update_delivery_safety_margin(session)
+
+    # 6. Drift monitoring
     drift_info = await check_model_drift(session)
 
     # Record completion in EventLog
@@ -1034,6 +1140,7 @@ async def run_nightly_learning(session: AsyncSession) -> dict[str, Any]:
                 "portion_models": n_portions,
                 "elasticity_models": n_elasticity,
                 "reply_buckets": [p25, p50, p75],
+                "delivery_safety_minutes": safety_minutes,
                 "drift_status": drift_info,
             },
             created_at=now,
@@ -1047,6 +1154,7 @@ async def run_nightly_learning(session: AsyncSession) -> dict[str, Any]:
         "portion_models_updated": n_portions,
         "elasticity_models_updated": n_elasticity,
         "reply_buckets": [p25, p50, p75],
+        "delivery_safety_minutes": safety_minutes,
         "drift": drift_info,
     }
 

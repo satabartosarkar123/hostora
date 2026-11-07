@@ -8,10 +8,16 @@
 <section class="card" id="plan-done-summary">
   <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
     <div>
-      <h2 style="margin:0;">Plan Complete</h2>
+      <h2 style="margin:0;">
+        Plan Complete
+        {% if done_plan.urgent_mode %}
+        <span class="badge badge--warn" id="urgent-mode-badge">Urgent Mode ({{ done_plan.minutes_left }} min left)</span>
+        {% endif %}
+      </h2>
       <p class="muted" style="margin:0.2rem 0 0 0;">
         Sized for <strong>{{ done_plan.headcount.adults }} adults</strong> and <strong>{{ done_plan.headcount.children }} children</strong>
         (Veg: {{ done_plan.headcount.veg_seats }}, Jain: {{ done_plan.headcount.jain_seats }}, Non-veg: {{ done_plan.headcount.non_veg_seats }})
+        · Time left: <strong>{{ done_plan.minutes_left }} min</strong>
         · Route: <code>{{ done_plan.route }}</code>
       </p>
     </div>
@@ -33,8 +39,81 @@
   </div>
   {% endif %}
 
-  <!-- 3 PANELS: Plan, Check these, Removed -->
+  <!-- PANELS: Build Carts, Plan, Check these, Won't arrive in time, Removed, When did it arrive -->
   <div style="display:grid; grid-template-columns: 1fr; gap:1.5rem; margin-top:1.5rem;">
+
+    <!-- Panel 0: Build Carts (Fewest Stores) -->
+    {% if done_plan.cart_plan and done_plan.cart_plan.carts %}
+    <div class="card" id="panel-build-carts" style="border-left: 4px solid var(--accent);">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <h3 style="margin:0;">Build Carts ({{ done_plan.cart_plan.carts | length }} store{% if done_plan.cart_plan.carts | length != 1 %}s{% endif %})</h3>
+        {% if done_plan.cart_plan.arrives_by %}
+        <span class="badge badge--success" id="carts-arrival-summary">
+          Everything arrives by {{ done_plan.cart_plan.arrives_by }} (within {{ done_plan.cart_plan.latest_arrival_minutes | int }} min)
+        </span>
+        {% endif %}
+      </div>
+      <p class="muted" style="margin:0.35rem 0 0.75rem 0; font-size:0.9rem;">
+        Covered with the fewest stores that fit your time left. Hostora fills your cart and opens checkout — it never places an order or takes payment.
+      </p>
+      <div style="display:grid; gap:0.75rem;">
+        {% for cart in done_plan.cart_plan.carts %}
+        <div class="card cart-store-card" id="cart-store-{{ cart.channel }}" data-channel="{{ cart.channel }}" style="margin:0; padding:0.75rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+            <div>
+              <strong>{{ cart.label }}</strong>
+              <span class="badge">{{ cart.eta_min_minutes | int }}–{{ cart.eta_max_minutes | int }} min ({{ cart.eta_source }})</span>
+              <span class="muted" style="font-size:0.88rem;">· Arrives by <strong>{{ cart.arrives_by }}</strong></span>
+            </div>
+            <div>
+              <strong>Est. ₹{{ "{:,}".format(cart.total_inr) }}</strong>
+            </div>
+          </div>
+          <p class="muted" style="margin:0.35rem 0; font-size:0.88rem;">
+            Items ({{ cart.item_names | length }}): <span class="cart-item-list">{{ cart.item_names | join(', ') }}</span>
+          </p>
+          <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin-top:0.5rem;">
+            {% if cart.connect_id and event_key is defined and event_key %}
+            <form
+              method="post"
+              action="/app/e/{{ event_key }}/plan/{{ done_plan.plan_id }}/carts/build"
+              hx-post="/app/e/{{ event_key }}/plan/{{ done_plan.plan_id }}/carts/build"
+              hx-target="#cart-action-result-{{ cart.channel }}"
+              hx-swap="innerHTML"
+              style="display:inline-flex; gap:0.4rem; align-items:center; flex-wrap:wrap;"
+            >
+              <input type="hidden" name="csrf_token" value="{{ csrf_token | default('') }}">
+              <input type="hidden" name="channel" value="{{ cart.channel }}">
+              {% for iid in cart.item_ids %}
+              <input type="hidden" name="qty_{{ iid }}" value="1">
+              {% endfor %}
+              <button type="submit" class="btn btn--sm build-cart-btn" id="build-cart-{{ cart.channel }}">
+                Add to my {{ cart.label }} cart
+              </button>
+            </form>
+            {% endif %}
+            <a
+              href="{{ cart.checkout_url }}"
+              class="btn btn--secondary btn--sm checkout-link"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Open {{ cart.label }}
+            </a>
+            <button
+              type="button"
+              class="btn btn--secondary btn--sm copy-list-btn"
+              onclick="navigator.clipboard && navigator.clipboard.writeText('{{ cart.item_names | join(', ') }}')"
+            >
+              Copy list
+            </button>
+          </div>
+          <div id="cart-action-result-{{ cart.channel }}" style="margin-top:0.4rem;"></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
 
     <!-- Panel 1: Plan (Allowed items) -->
     <div class="card" id="panel-plan">
@@ -61,8 +140,10 @@
           {% if it.options %}
           <div style="margin-top:0.5rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
             {% for opt in it.options %}
-            <a class="btn btn--secondary btn--sm offer-link" href="{{ opt.url }}" target="_blank" rel="noopener">
-              Buy on {{ opt.label }} {% if opt.inr_per_unit %}· ₹{{ opt.inr_per_unit }}/unit{% endif %}
+            <a class="btn btn--secondary btn--sm offer-link" href="{{ opt.url }}" target="_blank" rel="noopener noreferrer" data-channel="{{ opt.channel }}">
+              Buy on {{ opt.label }}
+              {% if opt.inr_per_unit %}· ₹{{ opt.inr_per_unit }}/unit{% endif %}
+              {% if opt.eta_max_minutes %}· {{ opt.eta_min_minutes | int }}–{{ opt.eta_max_minutes | int }}m{% endif %}
             </a>
             {% endfor %}
           </div>
@@ -136,7 +217,38 @@
       {% endif %}
     </div>
 
-    <!-- Panel 3: Removed Items -->
+    <!-- Panel 3: Won't Arrive in Time (Unfulfillable items + alternatives) -->
+    <div class="card" id="panel-wont-arrive" style="background:var(--surface-alt);">
+      <h3 style="margin-top:0; color:#b45309;">Won't Arrive in Time</h3>
+      {% if done_plan.unfulfillable %}
+      <div style="display:grid; gap:0.75rem;">
+        {% for unf in done_plan.unfulfillable %}
+        <div class="card unfulfillable-item" data-item-id="{{ unf.item_id }}" style="border-left: 4px solid #b45309; padding:0.75rem; margin:0;">
+          <strong>{{ unf.name }}</strong> ({{ unf.category }}) — <span class="muted">{{ unf.reason }}</span>
+          {% if unf.alternatives %}
+          <div style="margin-top:0.5rem;">
+            <strong>Grounded alternatives that can arrive in time:</strong>
+            <ul style="margin:0.25rem 0 0 0; padding-left:1.25rem;">
+              {% for alt in unf.alternatives %}
+              <li>
+                <strong>{{ alt.name }}</strong>: {{ alt.why }}
+                {% if alt.url %}
+                <a href="{{ alt.url }}" target="_blank" rel="noopener noreferrer" class="unfulfillable-alt-link" style="margin-left:0.35rem;">Buy now →</a>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="muted">Every planned item can arrive within the time left.</p>
+      {% endif %}
+    </div>
+
+    <!-- Panel 4: Removed Items -->
     <div class="card" id="removed-items-panel" style="background:var(--surface-alt);">
       <h3 style="margin-top:0; color:#dc2626;">Removed Items</h3>
       {% if done_plan.removed %}
@@ -156,6 +268,48 @@
       <p class="muted">No items were removed under active rules.</p>
       {% endif %}
     </div>
+
+    <!-- Panel 5: When did it arrive? (Delivery learning) -->
+    {% if event_key is defined and event_key %}
+    <div class="card" id="panel-delivery-report">
+      <h3 style="margin-top:0;">When did it arrive?</h3>
+      <p class="muted" style="margin:0 0 0.75rem 0; font-size:0.88rem;">
+        Report actual delivery time to improve learned ETAs and safety margins for your region.
+      </p>
+      <form
+        method="post"
+        action="/app/e/{{ event_key }}/plan/{{ done_plan.plan_id }}/delivery-report"
+        hx-post="/app/e/{{ event_key }}/plan/{{ done_plan.plan_id }}/delivery-report"
+        hx-target="#delivery-report-feedback"
+        hx-swap="innerHTML"
+        style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end;"
+      >
+        <input type="hidden" name="csrf_token" value="{{ csrf_token | default('') }}">
+        <div>
+          <label class="form-label" for="deliv-channel">Shop</label>
+          <select id="deliv-channel" name="channel" class="form-control">
+            <option value="instamart">Swiggy Instamart</option>
+            <option value="swiggy_food">Swiggy</option>
+            <option value="zomato">Zomato</option>
+            <option value="blinkit">Blinkit</option>
+            <option value="zepto">Zepto</option>
+            <option value="amazon">Amazon</option>
+            <option value="flipkart">Flipkart</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" for="deliv-promised">Promised max (min)</label>
+          <input id="deliv-promised" name="promised_max" type="number" min="1" value="30" class="form-control" style="width:7rem;">
+        </div>
+        <div>
+          <label class="form-label" for="deliv-actual">Actual (min)</label>
+          <input id="deliv-actual" name="actual_minutes" type="number" min="1" value="25" class="form-control" style="width:7rem;">
+        </div>
+        <button type="submit" class="btn btn--secondary btn--sm" id="submit-delivery-report-btn">Save Delivery Time</button>
+        <span id="delivery-report-feedback"></span>
+      </form>
+    </div>
+    {% endif %}
 
   </div>
 

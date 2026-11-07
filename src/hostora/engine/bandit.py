@@ -51,10 +51,13 @@ def rank_arms(
     return [arm for _, arm in scored]
 
 
-def days_band(days_left: float, edges: Sequence[float]) -> int:
-    """Index of the band ``days_left`` falls in, given increasing ``edges`` (from config).
+def days_band(value: float, edges: Sequence[float]) -> int:
+    """Index of the time-left band ``value`` falls in, given increasing ``edges`` (from config).
     Bands only group learning data; the ordering itself is learned."""
     for i, edge in enumerate(edges):
-        if days_left < edge:
+        if value < edge:
             return i
     return len(edges)
+
+
+minutes_band = days_band

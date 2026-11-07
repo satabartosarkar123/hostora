@@ -4,7 +4,15 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, select
 
-from hostora.db.models import Cohost, Event, Host, Household, Idempotency, KnowledgeFact
+from hostora.db.models import (
+    Cohost,
+    Event,
+    Host,
+    Household,
+    Idempotency,
+    KnowledgeFact,
+    StoreConnection,
+)
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +34,7 @@ async def delete_account(session: AsyncSession, host: HostIdentity) -> None:
             if hh_ids:
                 scopes = [f"rsvp:{hid}" for hid in hh_ids]
                 await session.execute(delete(Idempotency).where(Idempotency.scope.in_(scopes)))
+        await session.execute(delete(StoreConnection).where(StoreConnection.host_uid == host.uid))
         await session.execute(delete(KnowledgeFact).where(KnowledgeFact.host_uid == host.uid))
         await session.execute(delete(Cohost).where(Cohost.uid == host.uid))
         await session.execute(delete(Host).where(Host.uid == host.uid))

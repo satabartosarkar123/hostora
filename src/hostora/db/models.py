@@ -631,3 +631,35 @@ class OsmCache(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class StoreConnection(Base):
+    __tablename__ = "store_connection"
+
+    host_uid: Mapped[str] = mapped_column(
+        Text, ForeignKey("host.uid", ondelete="CASCADE"), primary_key=True
+    )
+    store: Mapped[str] = mapped_column(Text, primary_key=True)
+    token_enc: Mapped[str] = mapped_column(Text, nullable=False)
+    scopes: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'")
+    )
+    connected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class DeliveryReport(Base):
+    __tablename__ = "delivery_report"
+    __table_args__ = (Index("delivery_report_chan_reg_idx", "channel", "region"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    channel: Mapped[str] = mapped_column(Text, nullable=False)
+    region: Mapped[str] = mapped_column(Text, nullable=False)
+    item_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    promised_max: Mapped[float] = mapped_column(Double, nullable=False)
+    actual_minutes: Mapped[float] = mapped_column(Double, nullable=False)
+    reported_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

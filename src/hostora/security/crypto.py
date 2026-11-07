@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 _DIGITS_RE = re.compile(r"\D+")
 _AAD = b"hostora.phone.v1"
+_STORE_AAD = b"hostora.store_token.v1"
 
 
 def _b64u_encode(data: bytes) -> str:
@@ -68,3 +69,25 @@ def ip_hash(ip: str, secret: str) -> str:
         secret.encode("utf-8"), ip.strip().encode("utf-8"), hashlib.sha256
     ).hexdigest()
     return digest[:16]
+
+
+def encrypt_store_token(token_payload: str, key_b64: str) -> str:
+    key = base64.b64decode(key_b64)
+    if len(key) != 32:
+        raise ValueError("STORE_TOKEN_KEY must decode to 32 bytes")
+    nonce = secrets.token_bytes(12)
+    ct = AESGCM(key).encrypt(nonce, token_payload.encode("utf-8"), _STORE_AAD)
+    return f"{_b64u_encode(nonce)}.{_b64u_encode(ct)}"
+
+
+def decrypt_store_token(value: str, key_b64: str) -> str:
+    key = base64.b64decode(key_b64)
+    if len(key) != 32:
+        raise ValueError("STORE_TOKEN_KEY must decode to 32 bytes")
+    parts = value.split(".")
+    if len(parts) != 2:
+        raise ValueError("Invalid encrypted store token format")
+    nonce = _b64u_decode(parts[0])
+    ct = _b64u_decode(parts[1])
+    pt = AESGCM(key).decrypt(nonce, ct, _STORE_AAD)
+    return pt.decode("utf-8")

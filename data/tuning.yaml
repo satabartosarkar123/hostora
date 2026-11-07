@@ -125,3 +125,16 @@ tuning:
     basis: "Upper bound of acceptable 80% coverage before declaring model drift"
     updated_by: null
 
+  delivery_safety_minutes:
+    value: 30.0
+    kind: learned
+    basis: "Prior 30 minutes delivery safety buffer; learned upward when hosts report late deliveries"
+    updated_by: "learn"
+
+  urgent_mode_minutes:
+    value: 180.0
+    kind: prior
+    basis: "Urgent mode threshold in minutes (3 hours): prefers ready-to-eat dishes and quick commerce"
+    updated_by: "learn"
+
+

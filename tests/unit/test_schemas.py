@@ -200,14 +200,16 @@ def test_rsvp_models_and_resolve_code() -> None:
 
 
 def test_plan_request_and_gate_scan() -> None:
-    pr = PlanRequest.model_validate({"functionId": "fn_1", "brief": "Halal dinner", "daysLeft": 5})
-    assert pr.days_left == 5
+    pr = PlanRequest.model_validate(
+        {"functionId": "fn_1", "brief": "Halal dinner", "minutesLeft": 120}
+    )
+    assert pr.minutes_left == 120
 
     with pytest.raises(ValidationError):
-        PlanRequest.model_validate({"functionId": "fn_1", "daysLeft": -1})
+        PlanRequest.model_validate({"functionId": "fn_1", "minutesLeft": -1})
 
     with pytest.raises(ValidationError):
-        PlanRequest.model_validate({"functionId": "fn_1", "daysLeft": 400})
+        PlanRequest.model_validate({"functionId": "fn_1", "minutesLeft": 600000})
 
     scan = GateScan.model_validate(
         {"deviceId": "dev_1234", "seq": 0, "passId": "p_1", "seats": 2, "at": 1700000000000}

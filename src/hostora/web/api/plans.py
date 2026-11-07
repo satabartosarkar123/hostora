@@ -9,26 +9,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from hostora.adapters.llm.router import LlmRouter
+from hostora.config import Settings
 from hostora.db.session import get_session
 from hostora.planner.pipeline import run_planner_stream
 from hostora.schemas.common import ApiModel
 from hostora.schemas.plan import (
+    BuildCartRequest,
     ConfirmItemRequest,
+    DeliveryReportRequest,
     Plan,
     PlanRequest,
     ReplaceItemRequest,
 )
 from hostora.security.firebase import HostIdentity
 from hostora.services.plans import (
+    build_store_cart_for_plan,
     confirm_plan_item,
     create_plan_run,
     get_plan_for_host,
     remove_plan_item,
     replace_plan_item,
+    report_plan_delivery,
     update_plan_item_purchase,
     verify_plan_access,
 )
-from hostora.web.deps import get_host_dep, get_llm_router_dep
+from hostora.web.deps import get_host_dep, get_llm_router_dep, get_settings_dep
 
 router = APIRouter(tags=["plans"])
 
@@ -57,8 +62,10 @@ async def api_stream_plan(
     llm_router: Annotated[LlmRouter, Depends(get_llm_router_dep)],
     fmt: Annotated[str, Query(alias="format")] = "html",
 ) -> EventSourceResponse:
-    await verify_plan_access(session, plan_id, host, need="view")
+    _row, fn = await verify_plan_access(session, plan_id, host, need="view")
+    event_key = fn.event_key
     templates = getattr(request.app.state, "templates", None)
+    live_store_offers = getattr(request.app.state, "live_store_offers", None)
 
     async def _stream() -> AsyncIterator[dict[str, str]]:
         async with request.app.state.sessionmaker() as run_session:
@@ -66,6 +73,7 @@ async def api_stream_plan(
                 session=run_session,
                 plan_id=plan_id,
                 router=llm_router,
+                live_store_offers=live_store_offers,
             ):
                 if fmt == "json" or templates is None:
                     if evt_name == "done" and isinstance(payload, Plan):
@@ -79,10 +87,10 @@ async def api_stream_plan(
                 else:
                     if evt_name == "stage":
                         tmpl = templates.env.get_template("host/_plan_stage.html")
-                        data_str = tmpl.render(stage=payload, done_plan=None)
+                        data_str = tmpl.render(stage=payload, done_plan=None, event_key=event_key)
                     elif evt_name == "done" and isinstance(payload, Plan):
                         tmpl = templates.env.get_template("host/_plan_stage.html")
-                        data_str = tmpl.render(stage=None, done_plan=payload)
+                        data_str = tmpl.render(stage=None, done_plan=payload, event_key=event_key)
                     else:
                         data_str = json.dumps(
                             payload if isinstance(payload, dict) else str(payload)
@@ -171,3 +179,36 @@ async def api_remove_plan_item(
         item_id,
         host,
     )
+
+
+@router.post("/v1/plans/{plan_id}/carts:build")
+async def api_build_store_cart(
+    plan_id: str,
+    body: BuildCartRequest,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+    host: Annotated[HostIdentity, Depends(get_host_dep)],
+) -> dict[str, Any]:
+    return await build_store_cart_for_plan(
+        session,
+        settings,
+        plan_id,
+        host,
+        channel=body.channel,
+        quantities=body.quantities,
+        instamart_server_override=getattr(request.app.state, "swiggy_instamart_mcp", None),
+        food_server_override=getattr(request.app.state, "swiggy_food_mcp", None),
+        zomato_server_override=getattr(request.app.state, "zomato_mcp", None),
+        refresh_fn=getattr(request.app.state, "store_refresh_fn", None),
+    )
+
+
+@router.post("/v1/plans/{plan_id}/delivery:report")
+async def api_report_delivery(
+    plan_id: str,
+    body: DeliveryReportRequest,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    host: Annotated[HostIdentity, Depends(get_host_dep)],
+) -> dict[str, Any]:
+    return await report_plan_delivery(session, plan_id, host, body)

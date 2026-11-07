@@ -28,6 +28,43 @@ web_grounding:
 store_products:
   swiggy_instamart_mcp: { enabled: false }   # turn on once Builders Club production access is granted
 
+stores:
+  swiggy:
+    enabled: true
+    mode: localhost   # localhost | production
+    instamart_mcp_url: "https://mcp.swiggy.com/im"
+    food_mcp_url: "https://mcp.swiggy.com/food"
+    oauth_authorize_url: "https://mcp.swiggy.com/oauth/authorize"
+    oauth_token_url: "https://mcp.swiggy.com/oauth/token"
+    checkout_instamart_url: "https://www.swiggy.com/instamart/checkout"
+    checkout_food_url: "https://www.swiggy.com/checkout"
+    capabilities:
+      search_products: ["search_products", "instamart_search_products"]
+      search_restaurants: ["search_restaurants", "search_dishes"]
+      get_menu: ["get_menu", "get_restaurant_menu"]
+      eta: ["get_eta", "check_serviceability", "get_addresses"]
+      cart_add: ["add_to_cart", "update_food_cart", "update_instamart_cart"]
+      cart_view: ["get_cart", "view_cart"]
+      checkout_link: ["get_checkout_url", "checkout_link"]
+      order_status: ["get_order_status", "track_order"]
+      forbidden_tools: ["place_food_order", "place_instamart_order", "place_order", "create_order", "pay_order", "confirm_payment"]
+  zomato:
+    enabled: false
+    mode: localhost   # localhost | production (requires Zomato OAuth redirect allowlisting)
+    mcp_url: "https://mcp-server.zomato.com/mcp"
+    oauth_authorize_url: "https://mcp-server.zomato.com/oauth/authorize"
+    oauth_token_url: "https://mcp-server.zomato.com/oauth/token"
+    checkout_url: "https://www.zomato.com/checkout"
+    capabilities:
+      search_restaurants: ["get_restaurants_for_keyword", "search_restaurants"]
+      get_menu: ["get_menu_items_listing", "get_restaurant_menu_by_categories"]
+      eta: ["get_saved_addresses_for_user", "get_delivery_eta"]
+      cart_add: ["create_cart", "add_to_cart"]
+      cart_view: ["get_cart", "view_cart"]
+      checkout_link: ["get_checkout_url", "checkout_cart"]
+      order_status: ["get_order_tracking_info", "get_order_status"]
+      forbidden_tools: ["place_order", "checkout_order", "make_payment", "submit_order"]
+
 policy:
   quorum: 2                  # independent source families that must explain an item
   require_non_model: true    # at least one of them is not an AI model

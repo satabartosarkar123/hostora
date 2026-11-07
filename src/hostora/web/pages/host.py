@@ -593,11 +593,20 @@ async def host_mark_invite_sent(
 
 
 @router.get("/app/settings")
-async def host_settings_page(request: Request) -> Response:
+async def host_settings_page(
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> Response:
     host = await _require_page_host(request)
     if host is None:
         return RedirectResponse(url="/app/login", status_code=303)
     lang = resolve_language(request)
+    from hostora.adapters.stores import get_store_connection_status
+
+    swiggy_status = await get_store_connection_status(session, settings, host.uid, "swiggy")
+    zomato_status = await get_store_connection_status(session, settings, host.uid, "zomato")
+    notice = request.query_params.get("notice")
     templates = request.app.state.templates
     resp: Response = templates.TemplateResponse(
         request,
@@ -608,16 +617,131 @@ async def host_settings_page(request: Request) -> Response:
             include_csrf=True,
             include_manifest=True,
             host=host,
+            swiggy_status=swiggy_status,
+            zomato_status=zomato_status,
+            store_notice=notice,
             error_message=None,
         ),
     )
     return _apply_lang_cookie(request, resp, lang)
 
 
+@router.post("/app/settings/stores/{store}/connect")
+async def host_connect_store_page(
+    store: str,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> Response:
+    host = await _require_page_host(request)
+    if host is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    if store not in ("swiggy", "zomato"):
+        raise ProblemError(404, "Store not found")
+
+    from datetime import UTC, datetime, timedelta
+
+    from hostora.adapters.stores import (
+        StoreTokenData,
+        build_oauth_authorize_url,
+        generate_pkce_pair,
+        get_store_config,
+        get_store_connection_status,
+        save_store_token,
+    )
+
+    cfg = get_store_config(store)
+    status = await get_store_connection_status(session, settings, host.uid, store)
+    if status == "not_approved_yet":
+        return RedirectResponse(
+            url=f"/app/settings?notice={store}_not_approved",
+            status_code=303,
+        )
+
+    verifier, challenge = generate_pkce_pair()
+    request.session[f"pkce_verifier_{store}"] = verifier
+
+    form = await request.form()
+    manual_token = str(form.get("access_token") or "").strip()
+    if manual_token or settings.demo_mode or settings.env == "test":
+        tok = manual_token or f"oauth_{store}_{host.uid}"
+        token_data = StoreTokenData(
+            access_token=tok,
+            refresh_token=f"refresh_{store}_{host.uid}",
+            scopes=["mcp:tools", "cart:write"],
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+        )
+        await save_store_token(session, settings, host.uid, store, token_data)
+        await session.commit()
+        return RedirectResponse(url=f"/app/settings?notice={store}_connected", status_code=303)
+
+    redirect_uri = f"{settings.public_origin.rstrip('/')}/app/settings/stores/{store}/callback"
+    auth_url = build_oauth_authorize_url(
+        store,
+        client_id=str(cfg.get("client_id", "hostora-local")),
+        redirect_uri=redirect_uri,
+        state=verifier[:16],
+        code_challenge=challenge,
+    )
+    return RedirectResponse(url=auth_url, status_code=303)
+
+
+@router.get("/app/settings/stores/{store}/callback")
+async def host_connect_store_callback(
+    store: str,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
+) -> Response:
+    host = await _require_page_host(request)
+    if host is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    if store not in ("swiggy", "zomato"):
+        raise ProblemError(404, "Store not found")
+
+    from hostora.adapters.stores import exchange_oauth_code, save_store_token
+
+    code = str(request.query_params.get("code") or "").strip()
+    verifier = str(request.session.pop(f"pkce_verifier_{store}", "") or "")
+    if not code or not verifier:
+        return RedirectResponse(url=f"/app/settings?notice={store}_oauth_error", status_code=303)
+
+    redirect_uri = f"{settings.public_origin.rstrip('/')}/app/settings/stores/{store}/callback"
+    token_data = await exchange_oauth_code(
+        store,
+        code=code,
+        code_verifier=verifier,
+        redirect_uri=redirect_uri,
+    )
+    await save_store_token(session, settings, host.uid, store, token_data)
+    await session.commit()
+    return RedirectResponse(url=f"/app/settings?notice={store}_connected", status_code=303)
+
+
+@router.post("/app/settings/stores/{store}/disconnect")
+async def host_disconnect_store_page(
+    store: str,
+    request: Request,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    host = await _require_page_host(request)
+    if host is None:
+        return RedirectResponse(url="/app/login", status_code=303)
+    if store not in ("swiggy", "zomato"):
+        raise ProblemError(404, "Store not found")
+
+    from hostora.adapters.stores import disconnect_store
+
+    await disconnect_store(session, host.uid, store)
+    await session.commit()
+    return RedirectResponse(url=f"/app/settings?notice={store}_disconnected", status_code=303)
+
+
 @router.post("/app/settings/delete")
 async def host_delete_account_page(
     request: Request,
     session: Annotated[AsyncSession, Depends(get_session)],
+    settings: Annotated[Settings, Depends(get_settings_dep)],
 ) -> Response:
     host = await _require_page_host(request)
     if host is None:
@@ -626,6 +750,10 @@ async def host_delete_account_page(
     form = await request.form()
     confirm_text = str(form.get("confirm") or "").strip()
     if confirm_text != "DELETE":
+        from hostora.adapters.stores import get_store_connection_status
+
+        swiggy_status = await get_store_connection_status(session, settings, host.uid, "swiggy")
+        zomato_status = await get_store_connection_status(session, settings, host.uid, "zomato")
         templates = request.app.state.templates
         resp: Response = templates.TemplateResponse(
             request,
@@ -636,6 +764,9 @@ async def host_delete_account_page(
                 include_csrf=True,
                 include_manifest=True,
                 host=host,
+                swiggy_status=swiggy_status,
+                zomato_status=zomato_status,
+                store_notice=None,
                 error_message="Please type DELETE to confirm account deletion.",
             ),
             status_code=422,

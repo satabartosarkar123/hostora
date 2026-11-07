@@ -7,6 +7,7 @@
 {% block nav %}
 <a class="btn btn--secondary" href="/app/e/{{ event_key }}">Dashboard</a>
 <a class="btn btn--secondary" href="/app/e/{{ event_key }}/budget">Budget</a>
+<a class="btn btn--secondary" href="/app/settings">Settings</a>
 <a class="btn btn--secondary" href="/app">Events</a>
 {% endblock %}
 
@@ -47,18 +48,28 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="plan-days-left">Days Left Override (changes shopping channels)</label>
-        <input
-          id="plan-days-left"
-          name="days_left"
-          type="number"
-          min="0"
-          max="365"
+        <label class="form-label" for="plan-minutes-left">Time Left Override (minutes until function starts)</label>
+        <select
+          id="plan-minutes-left"
+          name="minutes_left"
           class="form-control"
-          placeholder="Leave blank to calculate from function date"
         >
+          <option value="">Auto (from function start time in IST)</option>
+          <option value="60">1 hour (60 min)</option>
+          <option value="120">2 hours (120 min)</option>
+          <option value="360">6 hours (360 min)</option>
+          <option value="1440">Tomorrow (1,440 min)</option>
+          <option value="10080">Next week (10,080 min)</option>
+        </select>
+        <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.4rem;" id="time-left-presets">
+          <button type="button" class="btn btn--secondary btn--sm preset-time-btn" data-minutes="60" onclick="document.getElementById('plan-minutes-left').value='60'">1 hour</button>
+          <button type="button" class="btn btn--secondary btn--sm preset-time-btn" data-minutes="120" onclick="document.getElementById('plan-minutes-left').value='120'">2 hours</button>
+          <button type="button" class="btn btn--secondary btn--sm preset-time-btn" data-minutes="360" onclick="document.getElementById('plan-minutes-left').value='360'">6 hours</button>
+          <button type="button" class="btn btn--secondary btn--sm preset-time-btn" data-minutes="1440" onclick="document.getElementById('plan-minutes-left').value='1440'">Tomorrow</button>
+          <button type="button" class="btn btn--secondary btn--sm preset-time-btn" data-minutes="10080" onclick="document.getElementById('plan-minutes-left').value='10080'">Next week</button>
+        </div>
         <p class="muted" style="margin:0.25rem 0 0 0;">
-          0 days → 10-minute quick commerce (Blinkit/Zepto/Instamart); &gt;7 days → Amazon/Flipkart.
+          Only shops whose ETA + safety margin fits inside the time left are ever shown.
         </p>
       </div>
     </div>
