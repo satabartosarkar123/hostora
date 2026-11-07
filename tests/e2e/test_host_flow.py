@@ -45,10 +45,12 @@ def test_host_flow_live_sse_updates_dashboard(live_server: str, browser_name: st
         assert "Sharma Family" in host_page.content()
         assert "Gill Family" in host_page.content()
 
-        # 4. Get one invite link from the invite page
+        # 4. Get Sharma Family's invite link from the invite page
         host_page.click("a:has-text('Send Invites')")
         host_page.wait_for_url("**/invite")
-        first_invite_link = host_page.locator("a.invite-link").first.get_attribute("href")
+        first_invite_link = host_page.locator(
+            "tr:has-text('Sharma Family') a.invite-link"
+        ).first.get_attribute("href")
         assert first_invite_link is not None
 
         # 5. Open dashboard and wait for SSE connection to be open

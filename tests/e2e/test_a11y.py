@@ -71,19 +71,19 @@ def test_axe_accessibility_on_invite_done_dashboard_and_gate(
         res_done = axe.run(page)
         _assert_no_serious_or_critical_a11y_violations("done", res_done)
 
-        # 2. Host dashboard page
-        page.goto(f"{live_server}/app/login", wait_until="networkidle")
-        page.locator("form[action='/auth/demo'] button").click()
-        page.wait_for_url(f"{live_server}/app")
-        page.goto(f"{live_server}/app/e/DEM01", wait_until="networkidle")
-        res_dashboard = axe.run(page)
-        _assert_no_serious_or_critical_a11y_violations("dashboard", res_dashboard)
-
-        # 3. Gate page
-        page.goto(gate_url, wait_until="networkidle")
+        # 2. Gate page (before dashboard SSE stream)
+        page.goto(gate_url, wait_until="domcontentloaded")
         expect(page.locator("#gate-app")).to_have_attribute("data-ready", "true", timeout=10000)
         res_gate = axe.run(page)
         _assert_no_serious_or_critical_a11y_violations("gate", res_gate)
+
+        # 3. Host dashboard page
+        page.goto(f"{live_server}/app/login", wait_until="domcontentloaded")
+        page.locator("form[action='/auth/demo'] button").click()
+        page.wait_for_url(f"{live_server}/app")
+        page.goto(f"{live_server}/app/e/DEM01", wait_until="domcontentloaded")
+        res_dashboard = axe.run(page)
+        _assert_no_serious_or_critical_a11y_violations("dashboard", res_dashboard)
 
         context.close()
         browser.close()

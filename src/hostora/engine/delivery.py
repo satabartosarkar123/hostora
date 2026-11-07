@@ -116,4 +116,3 @@ def _cover_score(
 
 def _offer_key(o: Offer) -> tuple[float, float]:
     return (o.price_inr if o.price_inr is not None else float("inf"), o.eta.max_minutes)
-

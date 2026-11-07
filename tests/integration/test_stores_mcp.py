@@ -405,6 +405,165 @@ async def test_delivery_report_learns_eta_and_safety_margin(
     assert learned_safety > 30.0
 
 
+async def test_knowledge_services_and_host_planner_html_routes(
+    client: AsyncClient,
+    db: AsyncSession,
+    settings: Settings,
+    host_headers: dict[str, str],
+) -> None:
+    import httpx
+    import respx
+
+    from hostora.adapters.knowledge.cache import cache_evidence, get_cached_evidence
+    from hostora.engine.grounding import Evidence
+    from hostora.security.firebase import HostIdentity
+    from hostora.services.knowledge import (
+        calibrate_grounding,
+        explain_dish,
+        get_runtime_vocabulary,
+        refresh_knowledge,
+    )
+    from hostora.services.plans import (
+        confirm_plan_item,
+        remove_plan_item,
+        replace_plan_item,
+        update_plan_item_purchase,
+    )
+
+    # 1. Knowledge cache and services
+    await cache_evidence(
+        "paneer tikka",
+        "dish_ingredients",
+        Evidence(
+            source="knowledge_base",
+            ingredients=("paneer", "spices"),
+            tags=frozenset({"dairy"}),
+            citation="https://www.wikidata.org/wiki/Q123",
+        ),
+        db,
+        host_uid="demo-host",
+    )
+    cached = await get_cached_evidence("paneer tikka", db, host_uid="demo-host")
+    assert len(cached) >= 1
+
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get("https://static.openfoodfacts.org/data/taxonomies/ingredients.json").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "en:paneer": {
+                        "name": {"en": "Paneer", "hi": "पनीर"},
+                        "synonyms": {"en": ["cottage cheese"]},
+                        "parents": ["en:dairy"],
+                    }
+                },
+            )
+        )
+        mock.get("https://world.openfoodfacts.org/api/v2/search").mock(
+            return_value=httpx.Response(200, json={"products": []})
+        )
+        mock.get(url__startswith="https://www.wikidata.org/w/api.php").mock(
+            return_value=httpx.Response(200, json={"search": []})
+        )
+        counts = await refresh_knowledge(db)
+        assert counts["concepts"] >= 1
+        vocab = await get_runtime_vocabulary(db)
+        assert vocab is not None
+
+        explained = await explain_dish("Paneer Tikka", ["pure_veg"], session=db)
+        assert explained.name == "Paneer Tikka"
+
+    thresh, risk, n = await calibrate_grounding(0.01, session=db)
+    assert n == 150
+    assert risk <= 0.05
+    assert thresh > 0
+
+    # 2. Plan item mutations and HTML pages (host + planner)
+    await seed_demo_event(db, settings)
+    ev_resp = await client.get("/v1/events/DEM01", headers=host_headers)
+    fn_id = ev_resp.json()["functions"][0]["id"]
+
+    # Log in via demo session so HTML routes are authenticated
+    login_resp = await client.get("/app/login")
+    assert login_resp.status_code == 200
+    demo_login = await client.post("/auth/demo")
+    assert demo_login.status_code in (200, 204, 303)
+    csrf_cookie = client.cookies.get("hostora_csrf", "")
+
+    # Visit host HTML pages
+    for path in (
+        "/app",
+        "/app/events/new",
+        "/app/e/DEM01",
+        "/app/e/DEM01/guests",
+        "/app/e/DEM01/invite",
+        "/app/e/DEM01/budget",
+        "/app/settings",
+        f"/app/e/DEM01/plan/{fn_id}",
+    ):
+        r = await client.get(path)
+        assert r.status_code == 200, f"Expected 200 for {path}, got {r.status_code}"
+
+    # Trigger HTML plan generation via HTMX POST
+    import re
+
+    settings_html = (await client.get("/app/settings")).text
+    m_csrf = re.search(r'name="csrf_token"\s+value="([^"]+)"', settings_html)
+    csrf_cookie = m_csrf.group(1) if m_csrf else ""
+    gen_r = await client.post(
+        f"/app/e/DEM01/plan/{fn_id}",
+        data={"brief": "Quick party", "minutes_left": "120", "csrf_token": csrf_cookie},
+        headers={"HX-Request": "true", "X-CSRF-Token": csrf_cookie},
+    )
+    assert gen_r.status_code == 200
+    assert "plan-stream-root" in gen_r.text
+
+    # Generate plan via API and test item operations + HTML planner routes
+    create_resp = await client.post(
+        "/v1/events/DEM01/plans",
+        headers=host_headers,
+        json={"functionId": fn_id, "brief": "Quick party", "minutesLeft": 120},
+    )
+    plan_id = create_resp.json()["planId"]
+    await client.get(f"/v1/plans/{plan_id}/stream?format=json", headers=host_headers)
+
+    plan_resp = await client.get(f"/v1/plans/{plan_id}", headers=host_headers)
+    plan_json = plan_resp.json()
+    first_item_id = plan_json["items"][0]["itemId"]
+
+    host = HostIdentity(uid="demo-host", name="Demo Host")
+    await update_plan_item_purchase(db, plan_id, first_item_id, host, bought=True, actual_inr=500)
+    await confirm_plan_item(db, plan_id, first_item_id, host, confirmations=["composition"])
+    replaced_plan = await replace_plan_item(db, plan_id, first_item_id, host, name="Jeera Rice")
+    rep_id = next(it.item_id for it in replaced_plan.items if it.name == "Jeera Rice")
+    await remove_plan_item(db, plan_id, rep_id, host)
+
+    # Test planner HTML endpoints (toggle purchase, delivery report, budget page with plan)
+    rem_item_id = plan_json["items"][1]["itemId"]
+    tog_r = await client.post(
+        f"/app/e/DEM01/plan/{plan_id}/items/{rem_item_id}/toggle",
+        data={"bought": "true", "actual_inr": "450", "csrf_token": csrf_cookie},
+        headers={"HX-Request": "true", "X-CSRF-Token": csrf_cookie},
+    )
+    assert tog_r.status_code == 200
+
+    deliv_r = await client.post(
+        f"/app/e/DEM01/plan/{plan_id}/delivery-report",
+        data={
+            "channel": "instamart",
+            "item_kind": "supply",
+            "promised_max": "30",
+            "actual_minutes": "28",
+            "csrf_token": csrf_cookie,
+        },
+        headers={"HX-Request": "true", "X-CSRF-Token": csrf_cookie},
+    )
+    assert deliv_r.status_code == 200
+
+    bud_r = await client.get("/app/e/DEM01/budget")
+    assert bud_r.status_code == 200
+
+
 @pytest.mark.store_live
 async def test_swiggy_instamart_live_search_and_cart_without_checkout() -> None:
     token = os.environ.get("SWIGGY_LIVE_ACCESS_TOKEN", "").strip()

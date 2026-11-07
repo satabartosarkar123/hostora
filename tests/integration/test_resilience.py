@@ -79,7 +79,7 @@ async def test_resilience_groq_429_or_timeout_falls_back_to_template(
             db,
             event_row.event_key,
             host,
-            PlanRequest(function_id=fn_id, days_left=5, brief="Simple food"),
+            PlanRequest(function_id=fn_id, minutes_left=5 * 1440, brief="Simple food"),
         )
         plan_id = plan_ref["planId"]
 
@@ -176,3 +176,89 @@ async def test_resilience_killed_planner_run_cleanup_marks_failed(
         await db.refresh(refetched)
         assert refetched.status == "failed"
         assert refetched.finished_at is not None
+
+
+@pytest.mark.db
+@pytest.mark.asyncio
+async def test_resilience_all_stores_down_falls_back_to_feasible_search_links(
+    db: AsyncSession,
+    settings: Settings,
+) -> None:
+    from hostora.adapters.stores import StoreTokenData, save_store_token
+
+    host = HostIdentity(uid="resilience-host-stores-down", name="Resilience Store Host")
+    now = datetime.now(UTC)
+    evt_input = CreateEventInput(
+        title="Resilience Stores Down Dinner",
+        type=EventType.BIRTHDAY,
+        venue=Venue(label="Home Dining", lat=28.6, lng=77.2),
+        budget_inr=100000,
+        functions=[
+            FunctionInput(
+                name="Dinner",
+                meal="dinner",
+                starts_at=now + timedelta(minutes=120),
+                rules=[],
+            )
+        ],
+    )
+    event_row = await create_event(db, host, evt_input, now=now)
+    fn_id = event_row.functions[0].id
+
+    # Save connected store rows pointing to unreachable MCP servers
+    await save_store_token(
+        db,
+        settings,
+        host.uid,
+        "swiggy",
+        StoreTokenData(
+            access_token="tok_swiggy_down",
+            refresh_token="ref_swiggy_down",
+            expires_at=now + timedelta(hours=1),
+            scopes=["mcp:tools"],
+        ),
+    )
+    await save_store_token(
+        db,
+        settings,
+        host.uid,
+        "zomato",
+        StoreTokenData(
+            access_token="tok_zomato_down",
+            refresh_token="ref_zomato_down",
+            expires_at=now + timedelta(hours=1),
+            scopes=["mcp:tools"],
+        ),
+    )
+    await db.commit()
+
+    plan_ref = await create_plan_run(
+        db,
+        event_row.event_key,
+        host,
+        PlanRequest(function_id=fn_id, minutes_left=120, brief="Quick dinner"),
+    )
+    plan_id = plan_ref["planId"]
+
+    with respx.mock(assert_all_called=False) as mock:
+        mock.route(host="mcp.swiggy.com").mock(return_value=httpx.Response(503))
+        mock.route(host="mcp-server.zomato.com").mock(return_value=httpx.Response(503))
+
+        app = create_app(settings)
+        final_plan: Plan | None = None
+        async for ev_type, payload in run_planner_stream(
+            db,
+            plan_id=plan_id,
+            router=app.state.llm_router,
+        ):
+            if ev_type == "done" and isinstance(payload, Plan):
+                final_plan = payload
+
+    assert final_plan is not None
+    assert final_plan.minutes_left == 120
+    assert len(final_plan.items) > 0
+    for item in final_plan.items:
+        assert len(item.offers) > 0
+        for off in item.offers:
+            assert off.kind in {"quick", "food"}
+    assert len(final_plan.cart_plan.carts) + len(final_plan.cart_plan.unfulfillable) > 0

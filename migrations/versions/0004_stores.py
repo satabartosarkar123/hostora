@@ -70,4 +70,3 @@ def downgrade() -> None:
     op.drop_index("delivery_report_chan_reg_idx", table_name="delivery_report")
     op.drop_table("delivery_report")
     op.drop_table("store_connection")
-

@@ -91,4 +91,3 @@ def test_property_every_choice_arrives_in_time_and_nothing_is_lost(
 def test_eta_validation() -> None:
     with pytest.raises(ValueError, match="min_minutes"):
         Eta(30, 10, "declared")
-
