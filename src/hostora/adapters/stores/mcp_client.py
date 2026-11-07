@@ -491,8 +491,14 @@ def discover_store_capabilities(
                 f"(available tools: {available})"
             )
         tool_obj = tool_by_name[mapped[req_cap]]
-        schema = getattr(tool_obj, "inputSchema", None) or (
-            tool_obj.get("inputSchema") if isinstance(tool_obj, dict) else None
+        schema = (
+            getattr(tool_obj, "input_schema", None)
+            or getattr(tool_obj, "inputSchema", None)
+            or (
+                (tool_obj.get("inputSchema") or tool_obj.get("input_schema"))
+                if isinstance(tool_obj, dict)
+                else None
+            )
         )
         if not isinstance(schema, dict) or schema.get("type") != "object":
             raise StoreContractError(
@@ -599,6 +605,17 @@ class McpStoreSession:
         return {}
 
 
+def _unwrap_store_error(exc: BaseExceptionGroup) -> StoreError | None:
+    for sub in exc.exceptions:
+        if isinstance(sub, StoreError):
+            return sub
+        if isinstance(sub, BaseExceptionGroup):
+            nested = _unwrap_store_error(sub)
+            if nested is not None:
+                return nested
+    return None
+
+
 @asynccontextmanager
 async def open_store_mcp_session(
     store: str,
@@ -610,8 +627,27 @@ async def open_store_mcp_session(
     required_capabilities: Sequence[str] = (),
 ) -> AsyncIterator[McpStoreSession]:
     """Open an MCP session over streamable HTTP (or an injected ``MCPServer`` in tests)."""
-    if server_override is not None:
-        async with mcp.Client(server_override) as client:
+    try:
+        if server_override is not None:
+            async with mcp.Client(server_override) as client:
+                sess = McpStoreSession(
+                    store,
+                    client,
+                    forbidden_terms=forbidden_terms,
+                    required_capabilities=required_capabilities,
+                )
+                await sess.initialize()
+                yield sess
+            return
+
+        headers: dict[str, str] = {}
+        if access_token:
+            headers["Authorization"] = f"Bearer {access_token}"
+
+        async with (
+            httpx2.AsyncClient(headers=headers, timeout=15.0) as http_client,
+            mcp.Client(streamable_http_client(url, http_client=http_client)) as client,
+        ):
             sess = McpStoreSession(
                 store,
                 client,
@@ -620,21 +656,8 @@ async def open_store_mcp_session(
             )
             await sess.initialize()
             yield sess
-        return
-
-    headers: dict[str, str] = {}
-    if access_token:
-        headers["Authorization"] = f"Bearer {access_token}"
-
-    async with (
-        httpx2.AsyncClient(headers=headers, timeout=15.0) as http_client,
-        mcp.Client(streamable_http_client(url, http_client=http_client)) as client,
-    ):
-        sess = McpStoreSession(
-            store,
-            client,
-            forbidden_terms=forbidden_terms,
-            required_capabilities=required_capabilities,
-        )
-        await sess.initialize()
-        yield sess
+    except BaseExceptionGroup as eg:
+        unwrapped = _unwrap_store_error(eg)
+        if unwrapped is not None:
+            raise unwrapped from eg
+        raise

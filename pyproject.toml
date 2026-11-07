@@ -91,6 +91,7 @@ markers = [
     "e2e: browser tests against a live server",
     "llm_live: calls a real LLM API (skipped unless keys are set)",
     "knowledge_live: calls real knowledge APIs (OFF, Wikidata, Web)",
+    "store_live: calls a live store MCP server with the host's login",
 ]
 
 [tool.coverage.run]
