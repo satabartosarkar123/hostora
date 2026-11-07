@@ -84,3 +84,62 @@ async def test_llm_router_privacy_guard_refuses_dirty_prompt() -> None:
     )
     assert res is None
     assert len(mock_client.recorded_prompts) == 0
+
+
+async def test_db_llm_cache_put_and_get() -> None:
+    from unittest.mock import AsyncMock, MagicMock
+
+    from pydantic import SecretStr
+
+    from hostora.adapters.llm.router import DbLlmCache, build_llm_router, get_llm_router
+    from hostora.config import Settings
+
+    mock_session = AsyncMock()
+    mock_sessionmaker = MagicMock(return_value=mock_session)
+    mock_session.__aenter__.return_value = mock_session
+    mock_tx = MagicMock()
+    mock_tx.__aenter__ = AsyncMock()
+    mock_tx.__aexit__ = AsyncMock()
+    mock_session.begin = MagicMock(return_value=mock_tx)
+
+    mock_row = MagicMock()
+    mock_row.route = "groq"
+    mock_row.text = '{"picks": ["paneer"]}'
+    mock_res = MagicMock()
+    mock_res.scalar_one_or_none.return_value = mock_row
+    mock_session.execute.return_value = mock_res
+
+    cache = DbLlmCache(mock_sessionmaker)
+    await cache.put("test_key", "groq", '{"picks": ["paneer"]}')
+    got = await cache.get("test_key")
+    assert got == ('{"picks": ["paneer"]}', "groq")
+
+    # None return
+    mock_res.scalar_one_or_none.return_value = None
+    assert await cache.get("missing_key") is None
+
+    s = Settings(
+        env="dev",
+        database_url="postgresql://localhost/test",
+        secret_key=SecretStr("x" * 32),
+        token_hmac_secret=SecretStr("x" * 32),
+        phone_enc_key=SecretStr("c29tZS0zMi1ieXRlLXBob25lLWVuYy1rZXktYjY0MDE="),
+        store_token_key=SecretStr("c29tZS0zMi1ieXRlLXN0b3JlLXRva2VuLWtleS1iNjQ="),
+        pass_signing_key=SecretStr("0" * 64),
+        pass_public_key="0" * 64,
+        cron_secret=SecretStr("x" * 32),
+        groq_api_key=SecretStr("gsk_test"),
+        gemini_api_key=SecretStr("gem_test"),
+        gemini_allowed=True,
+    )
+    import os
+
+    orig_test = os.environ.pop("PYTEST_CURRENT_TEST", None)
+    try:
+        r = build_llm_router(s, sessionmaker=mock_sessionmaker, data_version="v2")
+        assert len(r._clients) == 2
+        r2 = get_llm_router()
+        assert r2 is not None
+    finally:
+        if orig_test:
+            os.environ["PYTEST_CURRENT_TEST"] = orig_test
