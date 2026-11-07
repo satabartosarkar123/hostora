@@ -26,7 +26,7 @@ jobs:
       TEST_DATABASE_URL: postgresql://hostora:hostora@localhost:5432/hostora_test
       SECRET_KEY: test-secret-key-48-chars-long-for-testing-purposes-only
       TOKEN_HMAC_SECRET: test-token-hmac-secret-48-chars-long-for-testing-only
-      PHONE_ENC_KEY: c29tZS0zMi1ieXRlLXBob25lLWVuYy1rZXktYmFzZTY0
+      PHONE_ENC_KEY: c29tZS0zMi1ieXRlLXBob25lLWVuYy1rZXktYjY0MDE=
       STORE_TOKEN_KEY: c29tZS0zMi1ieXRlLXN0b3JlLXRva2VuLWtleS1iNjQ=
       PASS_SIGNING_KEY: 4ac86f0bfba2bce35f7642426a88e08e217debc55a896b7fe9ee01fe4fbcac29
       PASS_PUBLIC_KEY: 5efca91ba5777b9f3170caab26a9132d030535bc7347151005fe3299c48f23b5
